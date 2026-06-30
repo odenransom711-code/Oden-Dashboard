@@ -137,6 +137,22 @@ main {
   .water-iframe { height: 780px; }
 }
 
+.caffeine-embed { margin-top: 56px; }
+.caffeine-iframe {
+  display: block;
+  width: 100%;
+  height: 880px;
+  border: 0;
+  background: transparent;
+  border-radius: 16px;
+  overflow: hidden;
+  color-scheme: dark;
+}
+@media (max-width: 480px) {
+  .caffeine-embed { margin-top: 40px; }
+  .caffeine-iframe { height: 780px; }
+}
+
 .stack-card {
   background: var(--bg-card);
   border-radius: 16px;
@@ -931,8 +947,13 @@ main {
   </div>
 
   <section id="water" class="water-embed">
-    <div class="section-title">Water Tracker</div>
+    <div class="section-title">Hydration</div>
     <iframe src="po-water.html" class="water-iframe" loading="lazy" title="Water Tracker"></iframe>
+  </section>
+
+  <section id="stimulation" class="caffeine-embed">
+    <div class="section-title">Stimulation</div>
+    <iframe src="caffeine.html" class="caffeine-iframe" loading="lazy" title="Caffeine Tracker"></iframe>
   </section>
 
   <div class="attribution">// editable template · all data stays in your browser</div>
