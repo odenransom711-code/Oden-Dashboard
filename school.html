@@ -268,6 +268,23 @@ body::after {
 }
 .day-toggle.on { background: rgba(255,255,255,0.12); color: var(--text-primary); border-color: rgba(255,255,255,0.22); }
 
+.task-badge {
+  font-size: 9.5px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase;
+  padding: 4px 8px; border-radius: 999px; flex-shrink: 0;
+}
+.task-badge.assignment { background: rgba(125,211,252,0.12); color: #7DD3FC; }
+.task-badge.exam { background: rgba(255,107,107,0.12); color: var(--danger); }
+.task-body { flex: 1; min-width: 0; }
+.task-title { font-size: 14px; color: var(--text-primary); }
+.task-class { font-size: 11px; color: var(--text-tertiary); margin-top: 2px; }
+.task-chip {
+  font-family: var(--font-mono); font-size: 11px; font-weight: 600;
+  padding: 5px 9px; border-radius: 8px; flex-shrink: 0;
+  background: rgba(255,255,255,0.05); color: var(--text-tertiary);
+}
+.task-chip.overdue { background: rgba(255,107,107,0.12); color: var(--danger); }
+.task-chip.today { background: rgba(242,192,99,0.12); color: var(--warning); }
+
 @media (max-width: 480px) {
   body { padding: max(20px, env(safe-area-inset-top)) 14px 50px; }
   .gm-card { padding: 16px; }
@@ -308,6 +325,26 @@ body::after {
         <input class="gm-input" id="classEndInput" type="time" style="max-width:110px">
         <input class="gm-input" id="classRoomInput" type="text" placeholder="Room (optional)" autocomplete="off" style="max-width:140px">
         <button class="gm-add" id="classAddBtn" type="button">+ Add class</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">Upcoming</div>
+    <div class="gm-card">
+      <div id="upcomingList"></div>
+
+      <div class="gm-input-wrap">
+        <input class="gm-input" id="taskTitleInput" type="text" placeholder="Title…" autocomplete="off" style="min-width:160px">
+        <select class="gm-input" id="taskTypeSelect" style="max-width:130px">
+          <option value="assignment">Assignment</option>
+          <option value="exam">Exam</option>
+        </select>
+        <select class="gm-input" id="taskClassSelect" style="max-width:160px">
+          <option value="">No class</option>
+        </select>
+        <input class="gm-input" id="taskDueInput" type="date" style="max-width:160px">
+        <button class="gm-add" id="taskAddBtn" type="button">+ Add</button>
       </div>
     </div>
   </div>
@@ -472,9 +509,130 @@ body::after {
     if (e.key === 'Enter') addClass();
   });
 
+  function todayStr() {
+    var d = new Date();
+    var y = d.getFullYear();
+    var m = String(d.getMonth() + 1).padStart(2, '0');
+    var day = String(d.getDate()).padStart(2, '0');
+    return y + '-' + m + '-' + day;
+  }
+  function daysUntil(dateStr) {
+    var today = new Date(todayStr() + 'T00:00:00');
+    var due = new Date(dateStr + 'T00:00:00');
+    return Math.round((due - today) / 86400000);
+  }
+  function countdownChip(dateStr) {
+    var n = daysUntil(dateStr);
+    if (n < 0) return { text: 'Overdue', cls: 'overdue' };
+    if (n === 0) return { text: 'Today', cls: 'today' };
+    if (n === 1) return { text: 'in 1 day', cls: '' };
+    return { text: 'in ' + n + ' days', cls: '' };
+  }
+
+  function renderTaskRowHtml(task, sem) {
+    var cls = task.classId ? sem.classes.filter(function (c) { return c.id === task.classId; })[0] : null;
+    var chip = countdownChip(task.dueDate);
+    var rowDoneClass = (task.type === 'assignment' && task.done) ? ' gm-row-done' : '';
+    var checkboxHtml = task.type === 'assignment'
+      ? '<input type="checkbox" class="gm-check" data-done-id="' + task.id + '"' + (task.done ? ' checked' : '') + '>'
+      : '';
+    return '' +
+      '<div class="gm-row' + rowDoneClass + '" data-id="' + task.id + '">' +
+        checkboxHtml +
+        '<span class="task-badge ' + task.type + '">' + (task.type === 'exam' ? 'Exam' : 'Assignment') + '</span>' +
+        '<div class="task-body">' +
+          '<div class="task-title">' + escapeHtml(task.title) + '</div>' +
+          (cls ? '<div class="task-class">' + escapeHtml(cls.name) + '</div>' : '') +
+        '</div>' +
+        '<span class="task-chip ' + chip.cls + '">' + chip.text + '</span>' +
+        '<button type="button" class="goal-delete" data-delete-id="' + task.id + '">×</button>' +
+      '</div>';
+  }
+
+  function renderUpcoming() {
+    var state = load();
+    var sem = activeSemester(state);
+    var list = document.getElementById('upcomingList');
+    if (!sem) { list.innerHTML = '<div class="empty-state">Add a semester to get started.</div>'; return; }
+    if (sem.tasks.length === 0) { list.innerHTML = '<div class="empty-state">Nothing upcoming — add one below.</div>'; return; }
+    var sorted = sem.tasks.slice().sort(function (a, b) { return a.dueDate < b.dueDate ? -1 : a.dueDate > b.dueDate ? 1 : 0; });
+    list.innerHTML = sorted.map(function (t) { return renderTaskRowHtml(t, sem); }).join('');
+  }
+
+  function renderTaskClassOptions() {
+    var state = load();
+    var sem = activeSemester(state);
+    var sel = document.getElementById('taskClassSelect');
+    var current = sel.value;
+    sel.innerHTML = '<option value="">No class</option>';
+    if (sem) {
+      sem.classes.forEach(function (c) {
+        var opt = document.createElement('option');
+        opt.value = c.id; opt.textContent = c.name;
+        sel.appendChild(opt);
+      });
+    }
+    var stillValid = false;
+    for (var i = 0; i < sel.options.length; i++) { if (sel.options[i].value === current) stillValid = true; }
+    sel.value = stillValid ? current : '';
+  }
+
+  document.getElementById('upcomingList').addEventListener('click', function (e) {
+    var btn = e.target.closest('[data-delete-id]');
+    if (!btn) return;
+    var state = load();
+    var sem = activeSemester(state);
+    if (!sem) return;
+    var id = btn.getAttribute('data-delete-id');
+    sem.tasks = sem.tasks.filter(function (t) { return t.id !== id; });
+    save(state);
+    render();
+  });
+  document.getElementById('upcomingList').addEventListener('change', function (e) {
+    var cb = e.target.closest('[data-done-id]');
+    if (!cb) return;
+    var state = load();
+    var sem = activeSemester(state);
+    if (!sem) return;
+    var task = sem.tasks.filter(function (t) { return t.id === cb.getAttribute('data-done-id'); })[0];
+    if (!task) return;
+    task.done = cb.checked;
+    save(state);
+    render();
+  });
+
+  function addTask() {
+    var titleEl = document.getElementById('taskTitleInput');
+    var dueEl = document.getElementById('taskDueInput');
+    var title = titleEl.value.trim();
+    var due = dueEl.value;
+    if (!title || !due) return;
+    var state = load();
+    var sem = activeSemester(state);
+    if (!sem) return;
+    sem.tasks.push({
+      id: uid('task'),
+      title: title,
+      type: document.getElementById('taskTypeSelect').value,
+      classId: document.getElementById('taskClassSelect').value || null,
+      dueDate: due,
+      done: false
+    });
+    save(state);
+    titleEl.value = '';
+    dueEl.value = '';
+    render();
+  }
+  document.getElementById('taskAddBtn').addEventListener('click', addTask);
+  document.getElementById('taskTitleInput').addEventListener('keydown', function (e) {
+    if (e.key === 'Enter') addTask();
+  });
+
   function render() {
     renderSemesterSelect();
     renderClasses();
+    renderTaskClassOptions();
+    renderUpcoming();
   }
 
   document.getElementById('semSelect').addEventListener('change', function (e) {
