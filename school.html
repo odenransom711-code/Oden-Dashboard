@@ -241,10 +241,38 @@ body::after {
 }
 .sem-add-input::placeholder { color: var(--text-tertiary); }
 
+.class-card {
+  background: rgba(255,255,255,0.035);
+  border: 1px solid rgba(255,255,255,0.06);
+  border-radius: 12px; padding: 14px; margin-bottom: 10px;
+  display: flex; align-items: flex-start; justify-content: space-between; gap: 12px;
+}
+.class-card-info { min-width: 0; }
+.class-name { font-size: 15px; font-weight: 700; color: var(--text-primary); }
+.class-meta { font-size: 12px; color: var(--text-tertiary); margin-top: 4px; }
+.class-card-right { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+.class-grade-input {
+  width: 64px; padding: 8px 10px; text-align: center;
+  border: 1px solid rgba(255,255,255,0.08); border-radius: 10px;
+  background: rgba(0,0,0,0.28); color: var(--text-primary);
+  font-family: inherit; font-size: 14px; outline: none;
+}
+.class-grade-input::placeholder { color: var(--text-tertiary); }
+
+.day-toggle-row { display: flex; gap: 6px; flex-wrap: wrap; }
+.day-toggle {
+  padding: 8px 10px; border: 1px solid rgba(255,255,255,0.10);
+  border-radius: 9px; background: rgba(255,255,255,0.04);
+  color: var(--text-tertiary); font-family: inherit;
+  font-size: 12px; font-weight: 600; cursor: pointer;
+}
+.day-toggle.on { background: rgba(255,255,255,0.12); color: var(--text-primary); border-color: rgba(255,255,255,0.22); }
+
 @media (max-width: 480px) {
   body { padding: max(20px, env(safe-area-inset-top)) 14px 50px; }
   .gm-card { padding: 16px; }
   .gm-progress-num { font-size: 36px; }
+  .class-card { flex-direction: column; }
 }
 </style>
 </head>
@@ -257,6 +285,31 @@ body::after {
     <select class="sem-select" id="semSelect"></select>
     <input class="sem-add-input" id="semAddInput" type="text" placeholder="New semester…" autocomplete="off">
     <button class="gm-ghost" id="semAddBtn" type="button">+ Add semester</button>
+  </div>
+
+  <div class="section">
+    <div class="section-title">Classes</div>
+    <div class="gm-card">
+      <div id="classesList"></div>
+
+      <div class="gm-input-wrap">
+        <input class="gm-input" id="classNameInput" type="text" placeholder="Class name…" autocomplete="off" style="min-width:160px">
+        <input class="gm-input" id="classInstructorInput" type="text" placeholder="Instructor (optional)" autocomplete="off" style="max-width:160px">
+        <div class="day-toggle-row" id="classDayToggleRow">
+          <button type="button" class="day-toggle" data-day="Mon">Mon</button>
+          <button type="button" class="day-toggle" data-day="Tue">Tue</button>
+          <button type="button" class="day-toggle" data-day="Wed">Wed</button>
+          <button type="button" class="day-toggle" data-day="Thu">Thu</button>
+          <button type="button" class="day-toggle" data-day="Fri">Fri</button>
+          <button type="button" class="day-toggle" data-day="Sat">Sat</button>
+          <button type="button" class="day-toggle" data-day="Sun">Sun</button>
+        </div>
+        <input class="gm-input" id="classStartInput" type="time" style="max-width:110px">
+        <input class="gm-input" id="classEndInput" type="time" style="max-width:110px">
+        <input class="gm-input" id="classRoomInput" type="text" placeholder="Room (optional)" autocomplete="off" style="max-width:140px">
+        <button class="gm-add" id="classAddBtn" type="button">+ Add class</button>
+      </div>
+    </div>
   </div>
 
 </div><!-- /.page -->
@@ -302,8 +355,126 @@ body::after {
     });
   }
 
+  function escapeHtml(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+      return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c];
+    });
+  }
+
+  function formatTime12(t) {
+    if (!t) return '';
+    var parts = t.split(':');
+    var h = parseInt(parts[0], 10);
+    var m = parts[1];
+    var ap = h >= 12 ? 'PM' : 'AM';
+    var h12 = h % 12; if (h12 === 0) h12 = 12;
+    return h12 + ':' + m + ' ' + ap;
+  }
+
+  function classMetaLine(cls) {
+    var bits = [];
+    if (cls.instructor) bits.push(cls.instructor);
+    if (cls.days && cls.days.length) bits.push(cls.days.join('/'));
+    if (cls.startTime && cls.endTime) bits.push(formatTime12(cls.startTime) + '–' + formatTime12(cls.endTime));
+    if (cls.room) bits.push(cls.room);
+    return bits.join(' · ');
+  }
+
+  function renderClassCardHtml(cls) {
+    var meta = classMetaLine(cls);
+    return '' +
+      '<div class="class-card" data-id="' + cls.id + '">' +
+        '<div class="class-card-info">' +
+          '<div class="class-name">' + escapeHtml(cls.name) + '</div>' +
+          (meta ? '<div class="class-meta">' + escapeHtml(meta) + '</div>' : '') +
+        '</div>' +
+        '<div class="class-card-right">' +
+          '<input class="class-grade-input" type="number" min="0" max="100" step="1" placeholder="—" value="' + (cls.grade == null ? '' : cls.grade) + '" data-grade-id="' + cls.id + '">' +
+          '<button type="button" class="goal-delete" data-delete-id="' + cls.id + '">×</button>' +
+        '</div>' +
+      '</div>';
+  }
+
+  function renderClasses() {
+    var state = load();
+    var sem = activeSemester(state);
+    var list = document.getElementById('classesList');
+    if (!sem) { list.innerHTML = '<div class="empty-state">Add a semester to get started.</div>'; return; }
+    if (sem.classes.length === 0) { list.innerHTML = '<div class="empty-state">No classes yet — add one below.</div>'; return; }
+    list.innerHTML = sem.classes.map(renderClassCardHtml).join('');
+  }
+
+  document.getElementById('classesList').addEventListener('click', function (e) {
+    var btn = e.target.closest('[data-delete-id]');
+    if (!btn) return;
+    var state = load();
+    var sem = activeSemester(state);
+    if (!sem) return;
+    var id = btn.getAttribute('data-delete-id');
+    sem.classes = sem.classes.filter(function (c) { return c.id !== id; });
+    save(state);
+    render();
+  });
+  document.getElementById('classesList').addEventListener('change', function (e) {
+    var input = e.target.closest('[data-grade-id]');
+    if (!input) return;
+    var state = load();
+    var sem = activeSemester(state);
+    if (!sem) return;
+    var cls = sem.classes.filter(function (c) { return c.id === input.getAttribute('data-grade-id'); })[0];
+    if (!cls) return;
+    var v = input.value === '' ? null : Math.max(0, Math.min(100, parseFloat(input.value)));
+    cls.grade = (v == null || isNaN(v)) ? null : v;
+    save(state);
+    render();
+  });
+
+  var selectedDays = [];
+  document.getElementById('classDayToggleRow').addEventListener('click', function (e) {
+    var btn = e.target.closest('.day-toggle');
+    if (!btn) return;
+    var day = btn.getAttribute('data-day');
+    var idx = selectedDays.indexOf(day);
+    if (idx === -1) selectedDays.push(day); else selectedDays.splice(idx, 1);
+    btn.classList.toggle('on');
+  });
+
+  function addClass() {
+    var nameEl = document.getElementById('classNameInput');
+    var name = nameEl.value.trim();
+    if (!name) return;
+    var state = load();
+    var sem = activeSemester(state);
+    if (!sem) return;
+    sem.classes.push({
+      id: uid('cls'),
+      name: name,
+      instructor: document.getElementById('classInstructorInput').value.trim(),
+      days: selectedDays.slice(),
+      startTime: document.getElementById('classStartInput').value,
+      endTime: document.getElementById('classEndInput').value,
+      room: document.getElementById('classRoomInput').value.trim(),
+      grade: null
+    });
+    save(state);
+    nameEl.value = '';
+    document.getElementById('classInstructorInput').value = '';
+    document.getElementById('classStartInput').value = '';
+    document.getElementById('classEndInput').value = '';
+    document.getElementById('classRoomInput').value = '';
+    selectedDays.length = 0;
+    var toggles = document.querySelectorAll('#classDayToggleRow .day-toggle');
+    for (var i = 0; i < toggles.length; i++) toggles[i].classList.remove('on');
+    render();
+  }
+  document.getElementById('classAddBtn').addEventListener('click', addClass);
+  document.getElementById('classNameInput').addEventListener('keydown', function (e) {
+    if (e.key === 'Enter') addClass();
+  });
+
   function render() {
     renderSemesterSelect();
+    renderClasses();
   }
 
   document.getElementById('semSelect').addEventListener('change', function (e) {
