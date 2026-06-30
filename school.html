@@ -305,6 +305,24 @@ body::after {
   </div>
 
   <div class="section">
+    <div class="section-title">Overview</div>
+    <div class="gm-card">
+      <div class="gm-header">
+        <div class="gm-header-left">
+          <div class="gm-eyebrow">Average Grade</div>
+          <div class="gm-progress-row">
+            <span class="gm-progress-num" id="ovAvgGrade">—</span>
+          </div>
+        </div>
+      </div>
+      <div class="stat-grid">
+        <div class="stat"><div class="stat-num" id="ovClassCount">0</div><div class="stat-label">Classes</div></div>
+        <div class="stat"><div class="stat-num" id="ovUpcomingCount">0</div><div class="stat-label">Upcoming</div></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="section">
     <div class="section-title">Classes</div>
     <div class="gm-card">
       <div id="classesList"></div>
@@ -628,11 +646,37 @@ body::after {
     if (e.key === 'Enter') addTask();
   });
 
+  function renderOverview() {
+    var state = load();
+    var sem = activeSemester(state);
+    var avgEl = document.getElementById('ovAvgGrade');
+    var classCountEl = document.getElementById('ovClassCount');
+    var upcomingCountEl = document.getElementById('ovUpcomingCount');
+    if (!sem) {
+      avgEl.textContent = '—';
+      classCountEl.textContent = '0';
+      upcomingCountEl.textContent = '0';
+      return;
+    }
+    var graded = sem.classes.filter(function (c) { return c.grade != null; });
+    if (graded.length === 0) {
+      avgEl.textContent = '—';
+    } else {
+      var sum = graded.reduce(function (acc, c) { return acc + c.grade; }, 0);
+      avgEl.textContent = (Math.round((sum / graded.length) * 10) / 10) + '%';
+    }
+    classCountEl.textContent = String(sem.classes.length);
+    var today = todayStr();
+    var upcoming = sem.tasks.filter(function (t) { return t.dueDate >= today; });
+    upcomingCountEl.textContent = String(upcoming.length);
+  }
+
   function render() {
     renderSemesterSelect();
     renderClasses();
     renderTaskClassOptions();
     renderUpcoming();
+    renderOverview();
   }
 
   document.getElementById('semSelect').addEventListener('change', function (e) {
