@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<script src="lock.js"></script>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#050506">
+<title>School · Dashboard</title>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="sync.js" defer></script>
+<script src="topbar.js" defer></script>
+
+<style>
+:root {
+  --text-primary: #FAFAFA;
+  --text-secondary: #B8B6B0;
+  --text-tertiary: #76746E;
+  --success: #6BE3A4;
+  --warning: #F2C063;
+  --danger:  #FF6B6B;
+  --font: -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+}
+* { box-sizing: border-box; }
+html, body {
+  margin: 0; padding: 0;
+  background: #050506;
+  color: var(--text-secondary);
+  font-family: var(--font);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  -webkit-text-size-adjust: 100%;
+}
+body {
+  min-height: 100vh;
+  position: relative;
+  overflow-x: hidden;
+  padding: max(28px, env(safe-area-inset-top)) 20px 60px;
+}
+body::before {
+  content: '';
+  position: fixed; inset: 0;
+  background:
+    radial-gradient(circle at 82% 14%, rgba(224, 118, 88, 0.16), transparent 45%),
+    radial-gradient(circle at 18% 90%, rgba(180, 180, 200, 0.06), transparent 50%);
+  filter: blur(40px);
+  pointer-events: none;
+  z-index: -2;
+  animation: drift 36s ease-in-out infinite alternate;
+}
+body::after {
+  content: '';
+  position: fixed; inset: 0;
+  background-image: radial-gradient(rgba(255,255,255,0.014) 1px, transparent 1px);
+  background-size: 3px 3px;
+  pointer-events: none;
+  z-index: -1;
+}
+@keyframes drift {
+  0%   { transform: translate3d(0,0,0); }
+  100% { transform: translate3d(-22px, 14px, 0); }
+}
+
+.page { max-width: 1100px; margin: 0 auto; }
+
+.dash-title {
+  margin: 0 0 14px;
+  font-size: 28px; font-weight: 700;
+  letter-spacing: -0.025em;
+  background: linear-gradient(180deg, #FFFFFF 0%, #C7C4BC 120%);
+  -webkit-background-clip: text; background-clip: text;
+  -webkit-text-fill-color: transparent; color: transparent;
+}
+@media (max-width: 480px) { .dash-title { font-size: 22px; } }
+
+.section { margin-top: 8px; }
+.section-title {
+  font-size: 10.5px; font-weight: 700;
+  letter-spacing: 0.18em; text-transform: uppercase;
+  color: var(--text-tertiary);
+  display: flex; align-items: center; gap: 12px;
+  margin-bottom: 12px;
+}
+.section-title::before {
+  content: ''; width: 18px; height: 1px;
+  background: var(--text-tertiary); opacity: 0.6;
+}
+.section-title::after {
+  content: ''; flex: 1; height: 1px;
+  background: linear-gradient(90deg, rgba(255,255,255,0.08), transparent);
+}
+
+.gm-card {
+  position: relative;
+  background: rgba(255, 255, 255, 0.04);
+  border-radius: 16px;
+  padding: 20px;
+  margin-bottom: 14px;
+  backdrop-filter: blur(24px) saturate(1.2);
+  -webkit-backdrop-filter: blur(24px) saturate(1.2);
+  box-shadow: 0 12px 40px rgba(0,0,0,0.45);
+  overflow: hidden;
+}
+.gm-header {
+  display: flex; align-items: flex-start; justify-content: space-between;
+  flex-wrap: wrap; gap: 12px; margin-bottom: 14px;
+}
+.gm-header-left { display: flex; flex-direction: column; }
+.gm-eyebrow {
+  font-size: 10.5px; font-weight: 700;
+  letter-spacing: 0.18em; text-transform: uppercase;
+  color: var(--text-tertiary); margin-bottom: 6px;
+}
+.gm-progress-row { display: flex; align-items: baseline; gap: 6px; }
+.gm-progress-num {
+  font-size: 42px; font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.045em; color: var(--text-primary); line-height: 1;
+}
+
+.stat-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 12px;
+}
+.stat {
+  background: rgba(255,255,255,0.035);
+  border: 1px solid rgba(255,255,255,0.06);
+  border-radius: 12px; padding: 14px;
+}
+.stat-num {
+  font-size: 26px; font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.03em; color: var(--text-primary); line-height: 1;
+}
+.stat-label {
+  margin-top: 6px;
+  font-size: 10.5px; font-weight: 600;
+  letter-spacing: 0.08em; text-transform: uppercase;
+  color: var(--text-tertiary);
+}
+
+.empty-state {
+  text-align: center; font-size: 12px; font-style: italic;
+  color: var(--text-tertiary); padding: 14px 0;
+}
+.gm-row {
+  display: flex; align-items: center; gap: 12px;
+  padding: 12px 14px; margin-bottom: 6px;
+  background: rgba(255,255,255,0.035);
+  border: 1px solid rgba(255,255,255,0.06);
+  border-radius: 12px;
+  transition: background 0.2s, opacity 0.3s;
+}
+.gm-row:hover { background: rgba(255,255,255,0.06); }
+.gm-row.gm-row-done { opacity: 0.45; background: rgba(107,227,164,0.04); }
+.gm-row.gm-row-done .task-title { text-decoration: line-through; text-decoration-color: rgba(255,255,255,0.4); }
+.gm-check {
+  appearance: none; -webkit-appearance: none;
+  width: 22px; height: 22px; flex-shrink: 0; margin: 0;
+  border: 1.5px solid rgba(255,255,255,0.18);
+  background: rgba(0,0,0,0.28); border-radius: 7px;
+  position: relative; cursor: pointer;
+  transition: background 0.2s, border-color 0.2s, box-shadow 0.25s;
+}
+.gm-check:checked {
+  background: var(--success); border-color: var(--success);
+  box-shadow: 0 0 12px rgba(107,227,164,0.40);
+}
+.gm-check:checked::after {
+  content: ''; position: absolute; left: 6px; top: 2px;
+  width: 6px; height: 11px;
+  border: solid #0A0A0B; border-width: 0 2.5px 2.5px 0;
+  transform: rotate(45deg);
+}
+.goal-delete {
+  border: 0; background: transparent; color: var(--text-tertiary);
+  font-size: 18px; cursor: pointer; padding: 0 4px;
+  opacity: 0.5; transition: opacity 0.2s, color 0.2s;
+}
+.gm-row:hover .goal-delete { opacity: 1; }
+.goal-delete:hover { color: var(--danger); }
+
+.gm-input-wrap {
+  display: flex; gap: 8px; align-items: center; flex-wrap: wrap;
+  margin-top: 14px; padding-top: 14px;
+  border-top: 1px solid rgba(255,255,255,0.06);
+}
+.gm-input {
+  flex: 1; min-width: 120px;
+  padding: 11px 14px;
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 12px; background: rgba(0,0,0,0.28);
+  color: var(--text-primary);
+  font-family: inherit; font-size: 14px; outline: none;
+  transition: border-color 0.2s, background 0.2s;
+}
+.gm-input::placeholder { color: var(--text-tertiary); }
+.gm-input:focus { border-color: rgba(255,255,255,0.28); background: rgba(0,0,0,0.36); }
+
+.gm-add {
+  padding: 11px 20px; border: 0; border-radius: 12px;
+  background: linear-gradient(180deg, #FFFFFF 0%, #E8E5DD 100%);
+  color: #0A0A0B; font-family: inherit; font-size: 13px; font-weight: 700;
+  cursor: pointer;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.9),
+    0 2px 8px rgba(0,0,0,0.35),
+    0 8px 22px rgba(0,0,0,0.25);
+  transition: transform 0.1s, filter 0.15s;
+}
+.gm-add:hover { filter: brightness(1.06); transform: translateY(-1px); }
+.gm-add:active { transform: translateY(0); }
+
+.gm-ghost {
+  padding: 11px 18px;
+  border: 1px solid rgba(255,255,255,0.10);
+  border-radius: 12px; background: rgba(255,255,255,0.04);
+  color: var(--text-primary);
+  font-family: inherit; font-size: 13px; font-weight: 600; cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+.gm-ghost:hover { background: rgba(255,255,255,0.07); border-color: rgba(255,255,255,0.18); }
+
+.school-header-row {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  margin-bottom: 20px;
+}
+.sem-select {
+  padding: 10px 14px; border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 12px; background: rgba(0,0,0,0.28);
+  color: var(--text-primary); font-family: inherit; font-size: 13px;
+  outline: none; cursor: pointer;
+}
+.sem-add-input {
+  width: 140px; padding: 10px 14px;
+  border: 1px solid rgba(255,255,255,0.08); border-radius: 12px;
+  background: rgba(0,0,0,0.28); color: var(--text-primary);
+  font-family: inherit; font-size: 13px; outline: none;
+}
+.sem-add-input::placeholder { color: var(--text-tertiary); }
+
+@media (max-width: 480px) {
+  body { padding: max(20px, env(safe-area-inset-top)) 14px 50px; }
+  .gm-card { padding: 16px; }
+  .gm-progress-num { font-size: 36px; }
+}
+</style>
+</head>
+<body>
+<div class="page">
+
+  <h1 class="dash-title">School</h1>
+
+  <div class="school-header-row">
+    <select class="sem-select" id="semSelect"></select>
+    <input class="sem-add-input" id="semAddInput" type="text" placeholder="New semester…" autocomplete="off">
+    <button class="gm-ghost" id="semAddBtn" type="button">+ Add semester</button>
+  </div>
+
+</div><!-- /.page -->
+
+<script>
+(function () {
+  'use strict';
+
+  var STORE_KEY = 'school_v1';
+
+  function load() {
+    try {
+      var v = JSON.parse(localStorage.getItem(STORE_KEY));
+      if (v && Array.isArray(v.semesters)) return v;
+    } catch (e) {}
+    return { activeSemesterId: null, semesters: [] };
+  }
+  function save(state) { localStorage.setItem(STORE_KEY, JSON.stringify(state)); }
+  function uid(prefix) { return prefix + '_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7); }
+  function activeSemester(state) {
+    return state.semesters.filter(function (s) { return s.id === state.activeSemesterId; })[0] || null;
+  }
+
+  function renderSemesterSelect() {
+    var state = load();
+    var sel = document.getElementById('semSelect');
+    sel.innerHTML = '';
+    if (state.semesters.length === 0) {
+      var opt = document.createElement('option');
+      opt.textContent = 'No semesters yet';
+      opt.value = '';
+      sel.appendChild(opt);
+      sel.disabled = true;
+      return;
+    }
+    sel.disabled = false;
+    state.semesters.forEach(function (s) {
+      var opt = document.createElement('option');
+      opt.value = s.id;
+      opt.textContent = s.name;
+      if (s.id === state.activeSemesterId) opt.selected = true;
+      sel.appendChild(opt);
+    });
+  }
+
+  function render() {
+    renderSemesterSelect();
+  }
+
+  document.getElementById('semSelect').addEventListener('change', function (e) {
+    var state = load();
+    state.activeSemesterId = e.target.value;
+    save(state);
+    render();
+  });
+
+  document.getElementById('semAddBtn').addEventListener('click', function () {
+    var input = document.getElementById('semAddInput');
+    var name = input.value.trim();
+    if (!name) return;
+    var state = load();
+    var sem = { id: uid('sem'), name: name, classes: [], tasks: [] };
+    state.semesters.push(sem);
+    state.activeSemesterId = sem.id;
+    save(state);
+    input.value = '';
+    render();
+  });
+  document.getElementById('semAddInput').addEventListener('keydown', function (e) {
+    if (e.key === 'Enter') document.getElementById('semAddBtn').click();
+  });
+
+  render();
+
+  if (window.initCloudSync) {
+    window.initCloudSync({
+      appKey: 'school',
+      syncedKeys: [STORE_KEY],
+      onApplied: render
+    });
+  }
+})();
+</script>
+</body>
+</html>
