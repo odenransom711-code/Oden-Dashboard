@@ -704,13 +704,14 @@ body::after {
 
   render();
 
-  if (window.initCloudSync) {
-    window.initCloudSync({
+  document.addEventListener('DOMContentLoaded', function () {
+    if (typeof initCloudSync !== 'function') return;
+    initCloudSync({
       appKey: 'school',
       syncedKeys: [STORE_KEY],
       onApplied: render
     });
-  }
+  });
 })();
 </script>
 </body>
