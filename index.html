@@ -267,6 +267,44 @@ body::after {
   position: absolute; bottom: 6px; left: 50%; transform: translateX(-50%);
   width: 4px; height: 4px; border-radius: 50%; background: #6BE3A4;
 }
+.cal-day-selected { border-color: rgba(107,227,164,0.8); background: rgba(107,227,164,0.08); }
+.cal-day-detail {
+  background: rgba(255,255,255,0.035);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 12px;
+  padding: 14px;
+  margin: -2px 0 8px;
+}
+.cal-detail-heading { font-size: 13px; font-weight: 700; color: var(--text-primary); margin-bottom: 10px; }
+.cal-detail-empty { font-size: 12px; font-style: italic; color: var(--text-tertiary); padding: 6px 0; }
+.cal-event-list { margin-bottom: 10px; }
+.cal-event-row {
+  display: flex; align-items: center; gap: 10px;
+  padding: 8px 10px; margin-bottom: 4px;
+  background: rgba(255,255,255,0.04); border-radius: 9px;
+}
+.cal-event-title { flex: 1; font-size: 13px; color: var(--text-primary); }
+.cal-event-time { font-family: var(--font-mono); font-size: 11px; color: var(--text-tertiary); }
+.cal-event-delete { border: 0; background: transparent; color: var(--text-tertiary); font-size: 16px; cursor: pointer; padding: 0 2px; }
+.cal-event-delete:hover { color: #FF6B6B; }
+.cal-event-add-row { display: flex; gap: 8px; flex-wrap: wrap; }
+.cal-event-input {
+  flex: 1; min-width: 100px; padding: 9px 12px;
+  border: 1px solid rgba(255,255,255,0.08); border-radius: 10px;
+  background: rgba(0,0,0,0.28); color: var(--text-primary);
+  font-family: inherit; font-size: 13px; outline: none;
+}
+.cal-event-input::placeholder { color: var(--text-tertiary); }
+.cal-event-time-input {
+  padding: 9px 10px; border: 1px solid rgba(255,255,255,0.08); border-radius: 10px;
+  background: rgba(0,0,0,0.28); color: var(--text-primary);
+  font-family: inherit; font-size: 13px; outline: none; max-width: 110px;
+}
+.cal-event-add-btn {
+  padding: 9px 16px; border: 0; border-radius: 10px;
+  background: linear-gradient(180deg, #FFFFFF 0%, #E8E5DD 100%);
+  color: #0A0A0B; font-family: inherit; font-size: 12px; font-weight: 700; cursor: pointer;
+}
 @media (max-width: 480px) {
   .cal-card { padding: 16px; }
   .cal-day { height: 38px; }
@@ -676,6 +714,41 @@ body::after {
     return weeks;
   }
 
+  var selectedDate = null;
+
+  function calEscapeHtml(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+      return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c];
+    });
+  }
+
+  function calRenderDetailHtml(dateStr, state) {
+    var dayEvents = state.events.filter(function (e) { return e.date === dateStr; }).sort(function (a, b) {
+      return (a.time || '').localeCompare(b.time || '');
+    });
+    var parts = dateStr.split('-');
+    var label = CAL_MONTHS[parseInt(parts[1], 10) - 1] + ' ' + parseInt(parts[2], 10) + ', ' + parts[0];
+    var listHtml = dayEvents.length === 0
+      ? '<div class="cal-detail-empty">No events yet.</div>'
+      : dayEvents.map(function (e) {
+          return '<div class="cal-event-row" data-id="' + e.id + '">' +
+                   '<span class="cal-event-title">' + calEscapeHtml(e.title) + '</span>' +
+                   (e.time ? '<span class="cal-event-time">' + calEscapeHtml(e.time) + '</span>' : '') +
+                   '<button type="button" class="cal-event-delete" data-delete-id="' + e.id + '">×</button>' +
+                 '</div>';
+        }).join('');
+    return '' +
+      '<div class="cal-day-detail">' +
+        '<div class="cal-detail-heading">' + label + '</div>' +
+        '<div class="cal-event-list">' + listHtml + '</div>' +
+        '<div class="cal-event-add-row">' +
+          '<input class="cal-event-input" id="calEventTitleInput" type="text" placeholder="Event title…" autocomplete="off">' +
+          '<input class="cal-event-time-input" id="calEventTimeInput" type="time">' +
+          '<button class="cal-event-add-btn" id="calEventAddBtn" type="button">+ Add</button>' +
+        '</div>' +
+      '</div>';
+  }
+
   function calRenderGrid() {
     var state = calLoad();
     var weeks = calBuildWeeks(viewYear, viewMonth);
@@ -688,16 +761,51 @@ body::after {
         var dateStr = calDateStr(viewYear, viewMonth, day);
         var isToday = today.y === viewYear && today.m === viewMonth && today.d === day;
         var hasEvents = state.events.some(function (e) { return e.date === dateStr; });
-        html += '<div class="cal-day' + (isToday ? ' cal-day-today' : '') + '" data-date="' + dateStr + '">' +
+        var isSelected = selectedDate === dateStr;
+        html += '<div class="cal-day' + (isToday ? ' cal-day-today' : '') + (isSelected ? ' cal-day-selected' : '') + '" data-date="' + dateStr + '">' +
                   '<span class="cal-day-num">' + day + '</span>' +
                   (hasEvents ? '<span class="cal-day-dot"></span>' : '') +
                 '</div>';
       });
       html += '</div>';
+      var weekHasSelected = selectedDate && week.some(function (day) { return day != null && calDateStr(viewYear, viewMonth, day) === selectedDate; });
+      if (weekHasSelected) html += calRenderDetailHtml(selectedDate, state);
     });
     document.getElementById('calGrid').innerHTML = html;
     document.getElementById('calMonthLabel').textContent = CAL_MONTHS[viewMonth] + ' ' + viewYear;
+    var addBtn = document.getElementById('calEventAddBtn');
+    if (addBtn) addBtn.addEventListener('click', calAddEvent);
+    var titleInput = document.getElementById('calEventTitleInput');
+    if (titleInput) titleInput.addEventListener('keydown', function (e) { if (e.key === 'Enter') calAddEvent(); });
   }
+
+  function calAddEvent() {
+    var titleEl = document.getElementById('calEventTitleInput');
+    var timeEl = document.getElementById('calEventTimeInput');
+    var title = titleEl.value.trim();
+    if (!title || !selectedDate) return;
+    var state = calLoad();
+    state.events.push({ id: calUid(), date: selectedDate, title: title, time: timeEl.value });
+    calSave(state);
+    calRenderGrid();
+  }
+
+  document.getElementById('calGrid').addEventListener('click', function (e) {
+    var del = e.target.closest('[data-delete-id]');
+    if (del) {
+      var state = calLoad();
+      state.events = state.events.filter(function (ev) { return ev.id !== del.getAttribute('data-delete-id'); });
+      calSave(state);
+      calRenderGrid();
+      return;
+    }
+    var dayCell = e.target.closest('.cal-day[data-date]');
+    if (dayCell) {
+      var dateStr = dayCell.getAttribute('data-date');
+      selectedDate = (selectedDate === dateStr) ? null : dateStr;
+      calRenderGrid();
+    }
+  });
 
   document.getElementById('calPrevBtn').addEventListener('click', function () {
     viewMonth--;
