@@ -196,6 +196,81 @@ body::after {
 .whoop-stat .l { font-size: 9.5px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-tertiary); margin-top: 5px; }
 .whoop-btn { width: 100%; margin-top: 14px; padding: 11px; border: 1px solid rgba(255,255,255,0.12); border-radius: 11px; background: transparent; color: var(--text-secondary); font-family: inherit; font-size: 12px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; cursor: pointer; transition: background 0.15s, color 0.15s; }
 .whoop-btn:hover { background: rgba(255,255,255,0.05); color: var(--text-primary); }
+
+/* ===== Calendar ===== */
+.section { margin-top: 8px; margin-bottom: 22px; }
+.section-title {
+  font-size: 10.5px; font-weight: 700;
+  letter-spacing: 0.18em; text-transform: uppercase;
+  color: var(--text-tertiary);
+  display: flex; align-items: center; gap: 12px;
+  margin-bottom: 12px;
+}
+.section-title::before {
+  content: ''; width: 18px; height: 1px;
+  background: var(--text-tertiary); opacity: 0.6;
+}
+.section-title::after {
+  content: ''; flex: 1; height: 1px;
+  background: linear-gradient(90deg, rgba(255,255,255,0.08), transparent);
+}
+.cal-card {
+  position: relative;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.06);
+  border-radius: 18px;
+  padding: 20px;
+  margin-bottom: 14px;
+  backdrop-filter: blur(24px) saturate(1.2);
+  -webkit-backdrop-filter: blur(24px) saturate(1.2);
+  box-shadow: 0 12px 40px rgba(0,0,0,0.45);
+}
+.cal-nav {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 14px;
+}
+.cal-nav-label {
+  font-size: 16px; font-weight: 700; color: var(--text-primary); letter-spacing: -0.01em;
+}
+.cal-nav-btn {
+  width: 32px; height: 32px;
+  display: inline-flex; align-items: center; justify-content: center;
+  border-radius: 9px; border: 1px solid rgba(255,255,255,0.10);
+  background: rgba(255,255,255,0.04); color: var(--text-secondary);
+  cursor: pointer; font-size: 16px; transition: background 0.15s, color 0.15s;
+}
+.cal-nav-btn:hover { background: rgba(255,255,255,0.08); color: var(--text-primary); }
+.cal-weekday-row {
+  display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px;
+  margin-bottom: 6px;
+}
+.cal-weekday {
+  text-align: center; font-size: 10.5px; font-weight: 700;
+  letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-tertiary);
+  padding: 4px 0;
+}
+.cal-week { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; margin-bottom: 4px; }
+.cal-day {
+  position: relative;
+  height: 44px;
+  display: flex; align-items: center; justify-content: center;
+  border-radius: 10px; border: 1px solid transparent;
+  cursor: pointer; transition: background 0.15s, border-color 0.15s;
+}
+.cal-day:hover { background: rgba(255,255,255,0.05); }
+.cal-day-empty { cursor: default; }
+.cal-day-empty:hover { background: transparent; }
+.cal-day-num { font-size: 13px; color: var(--text-secondary); font-variant-numeric: tabular-nums; }
+.cal-day-today { border-color: rgba(107,227,164,0.5); }
+.cal-day-today .cal-day-num { color: var(--text-primary); font-weight: 700; }
+.cal-day-dot {
+  position: absolute; bottom: 6px; left: 50%; transform: translateX(-50%);
+  width: 4px; height: 4px; border-radius: 50%; background: #6BE3A4;
+}
+@media (max-width: 480px) {
+  .cal-card { padding: 16px; }
+  .cal-day { height: 38px; }
+}
 </style>
 </head>
 <body>
@@ -209,6 +284,27 @@ body::after {
         <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
       </svg>
     </button>
+  </div>
+
+  <div class="section">
+    <div class="section-title">Calendar</div>
+    <div class="cal-card">
+      <div class="cal-nav">
+        <button class="cal-nav-btn" id="calPrevBtn" type="button" aria-label="Previous month">‹</button>
+        <span class="cal-nav-label" id="calMonthLabel"></span>
+        <button class="cal-nav-btn" id="calNextBtn" type="button" aria-label="Next month">›</button>
+      </div>
+      <div class="cal-weekday-row">
+        <div class="cal-weekday">Sun</div>
+        <div class="cal-weekday">Mon</div>
+        <div class="cal-weekday">Tue</div>
+        <div class="cal-weekday">Wed</div>
+        <div class="cal-weekday">Thu</div>
+        <div class="cal-weekday">Fri</div>
+        <div class="cal-weekday">Sat</div>
+      </div>
+      <div id="calGrid"></div>
+    </div>
   </div>
 
   <div class="bento">
@@ -536,6 +632,93 @@ body::after {
     const t = loadJSON(WHOOP_KEY, null);
     if (!t || !t.access) { window.location.href = 'health.html'; return; }
     $('whAction').textContent = 'Syncing…'; syncWhoop();
+  });
+})();
+</script>
+
+<script>
+(function () {
+  'use strict';
+
+  var CAL_KEY = 'calendar_v1';
+  var CAL_MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+
+  function calLoad() {
+    try {
+      var v = JSON.parse(localStorage.getItem(CAL_KEY));
+      if (v && Array.isArray(v.events)) return v;
+    } catch (e) {}
+    return { events: [] };
+  }
+  function calSave(state) { localStorage.setItem(CAL_KEY, JSON.stringify(state)); }
+  function calUid() { return 'evt_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7); }
+
+  function calToday() {
+    var d = new Date();
+    return { y: d.getFullYear(), m: d.getMonth(), d: d.getDate() };
+  }
+  function calPad2(n) { return n < 10 ? '0' + n : String(n); }
+  function calDateStr(y, m, day) { return y + '-' + calPad2(m + 1) + '-' + calPad2(day); }
+
+  var today0 = calToday();
+  var viewYear = today0.y;
+  var viewMonth = today0.m;
+
+  function calBuildWeeks(y, m) {
+    var firstDow = new Date(y, m, 1).getDay();
+    var daysInMonth = new Date(y, m + 1, 0).getDate();
+    var cells = [];
+    for (var i = 0; i < firstDow; i++) cells.push(null);
+    for (var day = 1; day <= daysInMonth; day++) cells.push(day);
+    while (cells.length % 7 !== 0) cells.push(null);
+    var weeks = [];
+    for (var i = 0; i < cells.length; i += 7) weeks.push(cells.slice(i, i + 7));
+    return weeks;
+  }
+
+  function calRenderGrid() {
+    var state = calLoad();
+    var weeks = calBuildWeeks(viewYear, viewMonth);
+    var today = calToday();
+    var html = '';
+    weeks.forEach(function (week) {
+      html += '<div class="cal-week">';
+      week.forEach(function (day) {
+        if (day == null) { html += '<div class="cal-day cal-day-empty"></div>'; return; }
+        var dateStr = calDateStr(viewYear, viewMonth, day);
+        var isToday = today.y === viewYear && today.m === viewMonth && today.d === day;
+        var hasEvents = state.events.some(function (e) { return e.date === dateStr; });
+        html += '<div class="cal-day' + (isToday ? ' cal-day-today' : '') + '" data-date="' + dateStr + '">' +
+                  '<span class="cal-day-num">' + day + '</span>' +
+                  (hasEvents ? '<span class="cal-day-dot"></span>' : '') +
+                '</div>';
+      });
+      html += '</div>';
+    });
+    document.getElementById('calGrid').innerHTML = html;
+    document.getElementById('calMonthLabel').textContent = CAL_MONTHS[viewMonth] + ' ' + viewYear;
+  }
+
+  document.getElementById('calPrevBtn').addEventListener('click', function () {
+    viewMonth--;
+    if (viewMonth < 0) { viewMonth = 11; viewYear--; }
+    calRenderGrid();
+  });
+  document.getElementById('calNextBtn').addEventListener('click', function () {
+    viewMonth++;
+    if (viewMonth > 11) { viewMonth = 0; viewYear++; }
+    calRenderGrid();
+  });
+
+  calRenderGrid();
+
+  document.addEventListener('DOMContentLoaded', function () {
+    if (typeof initCloudSync !== 'function') return;
+    initCloudSync({
+      appKey: 'calendar',
+      syncedKeys: [CAL_KEY],
+      onApplied: calRenderGrid
+    });
   });
 })();
 </script>
