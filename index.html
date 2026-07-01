@@ -305,6 +305,14 @@ body::after {
   background: linear-gradient(180deg, #FFFFFF 0%, #E8E5DD 100%);
   color: #0A0A0B; font-family: inherit; font-size: 12px; font-weight: 700; cursor: pointer;
 }
+.cal-agenda-title {
+  font-size: 10.5px; font-weight: 700; letter-spacing: 0.10em; text-transform: uppercase;
+  color: var(--text-tertiary); margin-bottom: 10px;
+}
+.cal-event-date {
+  font-family: var(--font-mono); font-size: 11px; font-weight: 600;
+  color: var(--text-tertiary); flex-shrink: 0; width: 56px;
+}
 @media (max-width: 480px) {
   .cal-card { padding: 16px; }
   .cal-day { height: 38px; }
@@ -342,6 +350,11 @@ body::after {
         <div class="cal-weekday">Sat</div>
       </div>
       <div id="calGrid"></div>
+    </div>
+
+    <div class="cal-card">
+      <div class="cal-agenda-title">Upcoming</div>
+      <div id="calAgenda"></div>
     </div>
   </div>
 
@@ -777,6 +790,40 @@ body::after {
     if (addBtn) addBtn.addEventListener('click', calAddEvent);
     var titleInput = document.getElementById('calEventTitleInput');
     if (titleInput) titleInput.addEventListener('keydown', function (e) { if (e.key === 'Enter') calAddEvent(); });
+    calRenderAgenda();
+  }
+
+  function calTodayStr() {
+    var t = calToday();
+    return calDateStr(t.y, t.m, t.d);
+  }
+
+  function calAgendaDateLabel(dateStr) {
+    var parts = dateStr.split('-');
+    var d = new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10));
+    var weekday = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][d.getDay()];
+    return weekday + ' ' + CAL_MONTHS[d.getMonth()].slice(0, 3) + ' ' + d.getDate();
+  }
+
+  function calRenderAgenda() {
+    var state = calLoad();
+    var today = calTodayStr();
+    var upcoming = state.events
+      .filter(function (e) { return e.date >= today; })
+      .sort(function (a, b) {
+        if (a.date !== b.date) return a.date < b.date ? -1 : 1;
+        return (a.time || '').localeCompare(b.time || '');
+      })
+      .slice(0, 5);
+    var el = document.getElementById('calAgenda');
+    if (upcoming.length === 0) { el.innerHTML = '<div class="cal-detail-empty">Nothing on the calendar yet.</div>'; return; }
+    el.innerHTML = upcoming.map(function (e) {
+      return '<div class="cal-event-row">' +
+               '<span class="cal-event-date">' + calAgendaDateLabel(e.date) + '</span>' +
+               '<span class="cal-event-title">' + calEscapeHtml(e.title) + '</span>' +
+               (e.time ? '<span class="cal-event-time">' + calEscapeHtml(e.time) + '</span>' : '') +
+             '</div>';
+    }).join('');
   }
 
   function calAddEvent() {
