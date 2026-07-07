@@ -1773,6 +1773,24 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   </div>
 </div>
 
+<div class="section" data-section="signals">
+  <div class="section-title">
+    <span class="section-title-text">STOCK SIGNALS</span>
+  </div>
+
+  <div class="sig-meta-row">
+    <span class="sig-meta-updated" id="sigUpdated">—</span>
+    <span class="sig-regime-badge" id="sigRegime" style="display:none"></span>
+  </div>
+
+  <div id="sigList"></div>
+  <div class="wish-empty-card" id="sigEmpty">
+    <div class="wish-empty-icon">📈</div>
+    <div class="wish-empty-title">No signals yet</div>
+    <div class="wish-empty-sub">This fills in automatically once the weekly options scan runs — check back Monday.</div>
+  </div>
+</div>
+
 <!-- ===== ACTIVE SUBSCRIPTIONS ===== -->
 <div class="section" data-section="subs">
   <div class="section-title">
@@ -1909,49 +1927,7 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   </div>
 </div>
 
-<div class="section" data-section="signals" hidden>
-  <div class="section-title">
-    <span class="section-title-text">STOCK SIGNALS</span>
-  </div>
-
-  <div class="sig-meta-row">
-    <span class="sig-meta-updated" id="sigUpdated">—</span>
-    <span class="sig-regime-badge" id="sigRegime" style="display:none"></span>
-  </div>
-
-  <div id="sigList"></div>
-  <div class="wish-empty-card" id="sigEmpty">
-    <div class="wish-empty-icon">📈</div>
-    <div class="wish-empty-title">No signals yet</div>
-    <div class="wish-empty-sub">This fills in automatically once the weekly options scan runs — check back Monday.</div>
-  </div>
 </div>
-
-</div>
-
-<!-- ===== BOTTOM TAB BAR ===== -->
-<nav class="bottom-tabs" id="bottomTabs" aria-label="Sections">
-  <button class="bot-tab active" data-tab="net">
-    <span class="bot-tab-icon">📊</span>
-    <span class="bot-tab-label">Net Worth</span>
-  </button>
-  <button class="bot-tab" data-tab="subs">
-    <span class="bot-tab-icon">🔁</span>
-    <span class="bot-tab-label">Subs</span>
-  </button>
-  <button class="bot-tab" data-tab="incoming">
-    <span class="bot-tab-icon">📦</span>
-    <span class="bot-tab-label">Orders</span>
-  </button>
-  <button class="bot-tab" data-tab="wish">
-    <span class="bot-tab-icon">🎯</span>
-    <span class="bot-tab-label">Wishlist</span>
-  </button>
-  <button class="bot-tab" data-tab="signals">
-    <span class="bot-tab-icon">📈</span>
-    <span class="bot-tab-label">Signals</span>
-  </button>
-</nav>
 
 <script>
 (function() {
@@ -1981,26 +1957,6 @@ input[type="date"]::-webkit-calendar-picker-indicator {
     crypto: { name: 'Crypto', color: '#FBBF24' },
     other:  { name: 'Other',  color: '#B794F4' }
   };
-
-  // ============================================================
-  // BOTTOM TABS — switch between Net Worth / Subs / Orders.
-  // Active tab persisted in localStorage.
-  // ============================================================
-  const TAB_KEY = 'finance_active_tab';
-  const tabs = document.querySelectorAll('.bot-tab');
-  const sections = document.querySelectorAll('.section[data-section]');
-  function setActiveTab(name) {
-    tabs.forEach(b => b.classList.toggle('active', b.dataset.tab === name));
-    sections.forEach(s => {
-      if (s.dataset.section === name) s.removeAttribute('hidden');
-      else s.setAttribute('hidden', '');
-    });
-    storeSet(TAB_KEY, name);
-    window.scrollTo({ top: 0, behavior: 'instant' });
-  }
-  tabs.forEach(b => b.addEventListener('click', () => setActiveTab(b.dataset.tab)));
-  const savedTab = storeGet(TAB_KEY);
-  setActiveTab(savedTab && ['net','subs','incoming','wish','signals'].includes(savedTab) ? savedTab : 'net');
 
   // ============================================================
   // NET WORTH (copied from the main dashboard, verbatim logic)
