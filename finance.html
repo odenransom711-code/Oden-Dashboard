@@ -1013,6 +1013,49 @@ html, body { scrollbar-width: none; -ms-overflow-style: none; }
   line-height: 1.5; max-width: 320px; margin: 0 auto;
 }
 
+/* ===== Stock Signals ===== */
+.sig-meta-row {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 12px; margin-bottom: 14px; flex-wrap: wrap;
+}
+.sig-meta-updated {
+  font-size: 11px; color: var(--text-tertiary);
+  font-family: var(--font-mono);
+}
+.sig-meta-updated.stale { color: var(--warning); }
+.sig-regime-badge {
+  font-size: 10px; font-weight: 800; letter-spacing: 0.12em; text-transform: uppercase;
+  padding: 5px 10px; border-radius: 999px;
+  font-family: var(--font-mono);
+}
+.sig-regime-badge.bull { background: rgba(107,227,164,0.14); color: var(--success); }
+.sig-regime-badge.bear { background: rgba(255,107,107,0.14); color: var(--danger); }
+.sig-regime-badge.neutral { background: rgba(255,255,255,0.06); color: var(--text-tertiary); }
+.sig-card {
+  display: flex; align-items: center; gap: 14px;
+  padding: 14px 16px; margin-bottom: 8px;
+}
+.sig-rank {
+  font-family: var(--font-mono); font-size: 13px; font-weight: 700;
+  color: var(--text-tertiary); width: 20px; flex-shrink: 0;
+}
+.sig-body { flex: 1; min-width: 0; }
+.sig-ticker { font-size: 18px; font-weight: 700; color: var(--text-primary); }
+.sig-detail {
+  font-size: 11.5px; color: var(--text-tertiary); margin-top: 2px;
+  font-family: var(--font-mono);
+}
+.sig-direction {
+  font-size: 11px; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase;
+  padding: 5px 10px; border-radius: 8px; flex-shrink: 0;
+}
+.sig-direction.call { background: rgba(107,227,164,0.14); color: var(--success); }
+.sig-direction.put { background: rgba(255,107,107,0.14); color: var(--danger); }
+.sig-confidence {
+  font-family: var(--font-mono); font-size: 20px; font-weight: 700;
+  color: var(--text-primary); flex-shrink: 0; min-width: 46px; text-align: right;
+}
+
 /* ===== Wishlist rows ===== */
 .wish-row {
   background: rgba(255,255,255,0.025);
@@ -1866,6 +1909,24 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   </div>
 </div>
 
+<div class="section" data-section="signals" hidden>
+  <div class="section-title">
+    <span class="section-title-text">STOCK SIGNALS</span>
+  </div>
+
+  <div class="sig-meta-row">
+    <span class="sig-meta-updated" id="sigUpdated">—</span>
+    <span class="sig-regime-badge" id="sigRegime" style="display:none"></span>
+  </div>
+
+  <div id="sigList"></div>
+  <div class="wish-empty-card" id="sigEmpty">
+    <div class="wish-empty-icon">📈</div>
+    <div class="wish-empty-title">No signals yet</div>
+    <div class="wish-empty-sub">This fills in automatically once the weekly options scan runs — check back Monday.</div>
+  </div>
+</div>
+
 </div>
 
 <!-- ===== BOTTOM TAB BAR ===== -->
@@ -1885,6 +1946,10 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   <button class="bot-tab" data-tab="wish">
     <span class="bot-tab-icon">🎯</span>
     <span class="bot-tab-label">Wishlist</span>
+  </button>
+  <button class="bot-tab" data-tab="signals">
+    <span class="bot-tab-icon">📈</span>
+    <span class="bot-tab-label">Signals</span>
   </button>
 </nav>
 
@@ -1935,7 +2000,7 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   }
   tabs.forEach(b => b.addEventListener('click', () => setActiveTab(b.dataset.tab)));
   const savedTab = storeGet(TAB_KEY);
-  setActiveTab(savedTab && ['net','subs','incoming','wish'].includes(savedTab) ? savedTab : 'net');
+  setActiveTab(savedTab && ['net','subs','incoming','wish','signals'].includes(savedTab) ? savedTab : 'net');
 
   // ============================================================
   // NET WORTH (copied from the main dashboard, verbatim logic)
@@ -3377,6 +3442,79 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   safeRenderTicker();
   setInterval(safeRenderTicker, 1500);
 
+  // ============================================================
+  // STOCK SIGNALS — pure display, no add/edit UI. Populated by a
+  // separate weekly automation writing to the 'stockpicks_v1' key
+  // under its own dedicated 'stockpicks' cloud-sync appKey.
+  // ============================================================
+  function formatSigUpdated(iso) {
+    if (!iso) return null;
+    const d = new Date(iso);
+    if (isNaN(d.getTime())) return null;
+    const days = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+    const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    let h = d.getHours();
+    const ampm = h >= 12 ? 'PM' : 'AM';
+    h = h % 12; if (h === 0) h = 12;
+    const min = String(d.getMinutes()).padStart(2, '0');
+    return days[d.getDay()] + ' ' + months[d.getMonth()] + ' ' + d.getDate() + ', ' + h + ':' + min + ' ' + ampm;
+  }
+
+  function renderSignals() {
+    const state = storeGet('stockpicks_v1');
+    const updatedEl = document.getElementById('sigUpdated');
+    const regimeEl = document.getElementById('sigRegime');
+    const listEl = document.getElementById('sigList');
+    const emptyEl = document.getElementById('sigEmpty');
+    if (!updatedEl || !regimeEl || !listEl || !emptyEl) return;
+
+    if (!state || !Array.isArray(state.signals) || state.signals.length === 0) {
+      updatedEl.textContent = '—';
+      updatedEl.classList.remove('stale');
+      regimeEl.style.display = 'none';
+      listEl.innerHTML = '';
+      emptyEl.style.display = '';
+      return;
+    }
+
+    emptyEl.style.display = 'none';
+
+    const formatted = formatSigUpdated(state.updatedAt);
+    const ageMs = state.updatedAt ? (Date.now() - new Date(state.updatedAt).getTime()) : null;
+    const isStale = ageMs != null && ageMs > 9 * 24 * 60 * 60 * 1000;
+    updatedEl.textContent = formatted ? ('Last updated: ' + formatted + (isStale ? ' (stale)' : '')) : '—';
+    updatedEl.classList.toggle('stale', isStale);
+
+    if (state.regime) {
+      const r = String(state.regime).toLowerCase();
+      regimeEl.style.display = '';
+      regimeEl.textContent = state.regime;
+      regimeEl.className = 'sig-regime-badge ' + (r === 'bull' ? 'bull' : r === 'bear' ? 'bear' : 'neutral');
+    } else {
+      regimeEl.style.display = 'none';
+    }
+
+    listEl.innerHTML = state.signals.map(function (s) {
+      const dirClass = String(s.direction).toLowerCase() === 'call' ? 'call' : 'put';
+      const detailBits = [];
+      if (s.strike != null) detailBits.push('Strike ' + s.strike);
+      if (s.expiration) detailBits.push('Exp ' + s.expiration);
+      return '' +
+        '<div class="card sig-card">' +
+          '<span class="sig-rank">#' + escapeHtml(String(s.rank != null ? s.rank : '')) + '</span>' +
+          '<div class="sig-body">' +
+            '<span class="sig-ticker">' + escapeHtml(s.ticker) + '</span>' +
+            (detailBits.length ? '<div class="sig-detail">' + escapeHtml(detailBits.join(' · ')) + '</div>' : '') +
+          '</div>' +
+          '<span class="sig-direction ' + dirClass + '">' + escapeHtml(s.direction) + '</span>' +
+          '<span class="sig-confidence">' + escapeHtml(String(s.confidence != null ? s.confidence : '—')) + '</span>' +
+        '</div>';
+    }).join('');
+  }
+
+  renderSignals();
+  window.renderSignals = renderSignals;
+
 })();
 </script>
 
@@ -3389,6 +3527,19 @@ document.addEventListener('DOMContentLoaded', function () {
     syncedPrefixes: ['nw:'],
     onApplied: function () {
       window.dispatchEvent(new Event('storage'));
+    }
+  });
+});
+</script>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+  if (typeof initCloudSync !== 'function') return;
+  initCloudSync({
+    appKey: 'stockpicks',
+    syncedKeys: ['stockpicks_v1'],
+    onApplied: function () {
+      if (window.renderSignals) window.renderSignals();
     }
   });
 });
