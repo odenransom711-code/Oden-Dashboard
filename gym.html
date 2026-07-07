@@ -2214,7 +2214,7 @@ img, video, canvas, svg { max-width: 100%; }
     const todayKey = wtDateKey(new Date());
     const suggested = todaySplit().name;
     const entry = doneDays[todayKey];
-    const tagged = entry && entry.split;
+    const tagged = entry && typeof entry === 'object' && entry.split;
     row.innerHTML = rot.map(name => {
       const isTagged = tagged === name;
       const isSuggested = !tagged && name === suggested;
@@ -2257,7 +2257,7 @@ img, video, canvas, svg { max-width: 100%; }
       const sum = summarizeDay(sets);
       const entry = doneDays[dk];
       const isDone = !!entry;
-      const taggedSplit = isDone && entry.split;
+      const taggedSplit = isDone && typeof entry === 'object' && entry.split;
       const exNames = sum.perEx.length
         ? sum.perEx.map(e => e.ex.name).slice(0, 3).join(', ') + (sum.perEx.length > 3 ? '…' : '')
         : (taggedSplit ? taggedSplit + ' · quick tag' : '');
