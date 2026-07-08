@@ -855,6 +855,11 @@ img, video, canvas, svg { max-width: 100%; }
 .po-tw-past-toggle[aria-expanded="true"] .po-tw-past-arrow {
   transform: rotate(180deg);
 }
+.po-tw-past-label {
+  margin-top: 10px;
+  font-size: 12px; font-weight: 600; color: var(--text-2);
+  letter-spacing: 0.04em;
+}
 .po-tw-past-body {
   margin-top: 6px;
   display: flex; flex-direction: column; gap: 6px;
@@ -1606,11 +1611,10 @@ img, video, canvas, svg { max-width: 100%; }
         <div class="po-tw-empty" id="poTwEmpty">No sets logged today — log one above and it'll appear here.</div>
       </div>
 
-      <button type="button" class="po-tw-past-toggle" id="poTwPastToggle" aria-expanded="false">
-        <span>Past workouts <span class="po-tw-past-count" id="poTwPastCount">0</span></span>
-        <span class="po-tw-past-arrow" id="poTwPastArrow">▾</span>
-      </button>
-      <div class="po-tw-past-body" id="poTwPastBody" style="display:none"></div>
+      <div class="po-tw-past-label">
+        Past workouts <span class="po-tw-past-count" id="poTwPastCount">0</span>
+      </div>
+      <div class="po-tw-past-body" id="poTwPastBody"></div>
     </div>
   </div>
 </div>
@@ -2287,14 +2291,6 @@ img, video, canvas, svg { max-width: 100%; }
     renderQuickTagRow();
     renderTodaysWorkout();
     renderPastWorkouts();
-  });
-  $('poTwPastToggle').addEventListener('click', () => {
-    const body = $('poTwPastBody');
-    const toggle = $('poTwPastToggle');
-    const open = body.style.display !== 'none';
-    body.style.display = open ? 'none' : 'flex';
-    body.style.flexDirection = 'column';
-    toggle.setAttribute('aria-expanded', open ? 'false' : 'true');
   });
 
   // ============================================================
