@@ -1376,33 +1376,21 @@ img, video, canvas, svg { max-width: 100%; }
       </div>
     </div>
 
-    <button class="wt-progress-link" id="wtProgressLink" type="button" aria-label="Open progress photos">
-      <div>
-        <div class="wt-progress-label">PROGRESS PHOTOS</div>
-        <div class="wt-progress-count" id="wtProgressCount">0 photos</div>
-      </div>
-      <span class="wt-progress-arrow">→</span>
-    </button>
   </div>
 
-  <!-- Progress photos overlay -->
-  <div class="wt-overlay" id="wtOverlay" aria-hidden="true">
-    <div class="wt-overlay-inner">
-      <div class="wt-overlay-h">
-        <button class="wt-back" id="wtBack" aria-label="Back">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>
-        </button>
-        <div class="wt-overlay-title">Progress</div>
-      </div>
-      <div class="wt-overlay-actions">
-        <button class="wt-overlay-action wt-overlay-primary" id="wtTakePhotoBtn">Take Photo</button>
-        <button class="wt-overlay-action wt-overlay-secondary" id="wtFromLibraryBtn">From Library</button>
-      </div>
-      <input type="file" id="wtFileCamera" accept="image/*" capture="environment" style="display:none">
-      <input type="file" id="wtFileLibrary" accept="image/*" style="display:none">
-      <div class="wt-photo-grid" id="wtPhotoGrid">
-        <div class="wt-photo-empty">No photos yet · tap Take Photo to start</div>
-      </div>
+  <!-- Progress photos — inline grid, always visible. Tapping "Take Photo"
+       still opens the full-screen camera (#wtCam), and tapping a photo
+       still opens the full-screen viewer (#wtViewer) — both unchanged. -->
+  <div class="po-sub-section">
+    <div class="po-sub-title">Progress photos <span class="wt-progress-count" id="wtProgressCount">0 photos</span></div>
+    <div class="wt-overlay-actions">
+      <button class="wt-overlay-action wt-overlay-primary" id="wtTakePhotoBtn">Take Photo</button>
+      <button class="wt-overlay-action wt-overlay-secondary" id="wtFromLibraryBtn">From Library</button>
+    </div>
+    <input type="file" id="wtFileCamera" accept="image/*" capture="environment" style="display:none">
+    <input type="file" id="wtFileLibrary" accept="image/*" style="display:none">
+    <div class="wt-photo-grid" id="wtPhotoGrid">
+      <div class="wt-photo-empty">No photos yet · tap Take Photo to start</div>
     </div>
   </div>
 
@@ -2100,6 +2088,7 @@ img, video, canvas, svg { max-width: 100%; }
     renderQuickTagRow();
     renderTodaysWorkout();
     renderPastWorkouts();
+    photosRender();
     // Pre-fill weight input with last logged weight (or starting weight)
     const ex = getCurrentEx();
     if (ex && !ex.bw) {
@@ -3146,16 +3135,6 @@ img, video, canvas, svg { max-width: 100%; }
     r.onload = (e) => photosAdd(e.target.result);
     r.readAsDataURL(file);
   }
-
-  $('wtProgressLink').addEventListener('click', () => {
-    photosRender();
-    $('wtOverlay').classList.add('is-open');
-    document.body.style.overflow = 'hidden';
-  });
-  $('wtBack').addEventListener('click', () => {
-    $('wtOverlay').classList.remove('is-open');
-    document.body.style.overflow = '';
-  });
 
   // Take Photo: try in-browser camera, fall back to file input
   let camStream = null;
