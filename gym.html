@@ -356,6 +356,10 @@ img, video, canvas, svg { max-width: 100%; }
   display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 14px;
 }
 .po-log-grid.po-bw-mode { grid-template-columns: 1fr; }
+.po-log-grid-3 {
+  display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-bottom: 14px;
+}
+.po-log-grid-3.po-bw-mode { grid-template-columns: 1fr 1fr; }
 .po-field { display: flex; flex-direction: column; gap: 8px; }
 .po-field > label {
   font-size: 10.5px; color: var(--text-3); font-weight: 700;
@@ -690,6 +694,7 @@ img, video, canvas, svg { max-width: 100%; }
 
   /* Stack weight + reps vertically so every rep button fits the screen */
   .po-log-grid { grid-template-columns: 1fr; gap: 14px; }
+  .po-log-grid-3 { grid-template-columns: 1fr; gap: 14px; }
   .po-reps-row { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 5px; }
   .po-reps-pill { padding: 14px 0; font-size: 14px; min-width: 0; }
   .po-w-btn { min-width: 44px; padding: 0 10px; font-size: 18px; }
@@ -1448,11 +1453,7 @@ img, video, canvas, svg { max-width: 100%; }
     <!-- Filters -->
     <div class="po-filters">
       <div class="po-seg-row">
-        <span class="po-seg-label">Gym</span>
-        <div class="po-seg-control" id="gymSeg"></div>
-      </div>
-      <div class="po-seg-row">
-        <span class="po-seg-label">Day</span>
+        <span class="po-seg-label">Day type</span>
         <div class="po-seg-control" id="daySeg"></div>
       </div>
     </div>
@@ -1472,22 +1473,33 @@ img, video, canvas, svg { max-width: 100%; }
       <div class="po-no-ex" id="noExMsg" style="display:none">No exercises here yet. Tap <strong>+</strong> to add one.</div>
     </div>
 
-    <!-- Log a set -->
+    <!-- Log a session -->
     <div class="po-sub-section">
-      <div class="po-sub-title">Log today's top set</div>
+      <div class="po-sub-title">Log this session</div>
       <div class="po-bw-banner" id="bwBanner">Bodyweight — log reps only</div>
       <div class="po-last-set" id="lastSet">
         <span class="po-last-label">Last time</span>
         <span class="po-last-value" id="lastSetValue"></span>
         <span class="po-last-meta" id="lastSetMeta"></span>
       </div>
-      <div class="po-log-grid" id="logGrid">
+      <div class="po-log-grid-3" id="logGrid">
         <div class="po-field" id="weightField">
           <label id="weightLabel">Weight (kg)</label>
           <div class="po-weight-row">
             <button class="po-w-btn" id="weightDownBtn" type="button">−</button>
             <input type="number" id="weightInput" step="0.5" inputmode="decimal" placeholder="0">
             <button class="po-w-btn" id="weightUpBtn" type="button">+</button>
+          </div>
+        </div>
+        <div class="po-field">
+          <label>Sets</label>
+          <div class="po-reps-row" id="setsRow" data-value="3">
+            <button type="button" class="po-reps-pill" data-v="1">1</button>
+            <button type="button" class="po-reps-pill" data-v="2">2</button>
+            <button type="button" class="po-reps-pill active" data-v="3">3</button>
+            <button type="button" class="po-reps-pill" data-v="4">4</button>
+            <button type="button" class="po-reps-pill" data-v="5">5</button>
+            <button type="button" class="po-reps-pill" data-v="6">6</button>
           </div>
         </div>
         <div class="po-field">
@@ -1505,7 +1517,7 @@ img, video, canvas, svg { max-width: 100%; }
           </div>
         </div>
       </div>
-      <button class="po-btn-primary" id="logBtn">Log set</button>
+      <button class="po-btn-primary" id="logBtn">Log session</button>
     </div>
 
     <!-- Prescription -->
@@ -1603,10 +1615,6 @@ img, video, canvas, svg { max-width: 100%; }
       <input type="text" id="exName" placeholder="e.g. Incline DB press">
     </div>
     <div class="po-field">
-      <label style="font-size:11px;color:var(--text-3);font-weight:700;letter-spacing:0.04em;text-transform:uppercase">Gym</label>
-      <div class="po-modal-seg" id="exGymSeg"></div>
-    </div>
-    <div class="po-field">
       <label style="font-size:11px;color:var(--text-3);font-weight:700;letter-spacing:0.04em;text-transform:uppercase">Day</label>
       <div class="po-modal-seg" id="exDaySeg"></div>
     </div>
@@ -1668,12 +1676,6 @@ img, video, canvas, svg { max-width: 100%; }
         <button data-u="kg">kg</button>
         <button data-u="lb">lb</button>
       </div>
-    </div>
-
-    <div class="po-set-section">
-      <h4>Gyms</h4>
-      <div class="po-set-list" id="setGyms"></div>
-      <button class="po-add-row-btn" id="setAddGym">+ Add gym</button>
     </div>
 
     <div class="po-set-section">
@@ -1812,15 +1814,9 @@ img, video, canvas, svg { max-width: 100%; }
   // RENDER
   // ============================================================
   function renderFilters() {
-    $('gymSeg').innerHTML = state.gyms.map(g =>
-      '<button class="po-seg-btn ' + (g.id === state.filterGym ? 'active' : '') + '" data-gym="' + g.id + '">' + escape(g.name) + '</button>'
-    ).join('');
     $('daySeg').innerHTML = state.days.map(d =>
       '<button class="po-seg-btn ' + (d.id === state.filterDay ? 'active' : '') + '" data-day="' + d.id + '">' + escape(d.name) + '</button>'
     ).join('');
-    $('gymSeg').querySelectorAll('.po-seg-btn').forEach(b => {
-      b.addEventListener('click', () => { state.filterGym = b.dataset.gym; state.currentEx = null; saveState(); renderAll(); });
-    });
     $('daySeg').querySelectorAll('.po-seg-btn').forEach(b => {
       b.addEventListener('click', () => {
         state.filterDay = b.dataset.day;
@@ -2037,22 +2033,9 @@ img, video, canvas, svg { max-width: 100%; }
   function renderRepsRow() {
     const row = document.getElementById('repsRow');
     if (!row) return;
-    const ex = getCurrentEx();
-    let repMin, repMax;
-    if (ex) {
-      repMin = Math.max(1, parseInt(ex.repMin, 10) || 1);
-      repMax = Math.max(repMin, parseInt(ex.repMax, 10) || repMin);
-    } else {
-      repMin = 4; repMax = 12;
-    }
-    const upper = Math.max(repMax + 2, repMin + 5);
-    const end = Math.min(upper, repMin + 15);
-
-    // Preserve the previously-selected rep if it still fits in the new
-    // range; otherwise default to the target (repMax).
+    const repMin = 1, end = 20;
     const prev = parseInt(row.dataset.value, 10);
-    const active = (prev >= repMin && prev <= end) ? prev : repMax;
-
+    const active = (prev >= repMin && prev <= end) ? prev : 8;
     let html = '';
     for (let i = repMin; i <= end; i++) {
       html += '<button type="button" class="po-reps-pill' +
@@ -2072,11 +2055,11 @@ img, video, canvas, svg { max-width: 100%; }
     renderTodaysWorkout();
     renderPastWorkouts();
     photosRender();
-    // Pre-fill weight input with last logged weight (or starting weight)
+    // Pre-fill weight input with last logged weight, if any
     const ex = getCurrentEx();
     if (ex && !ex.bw) {
       const logs = getLogs();
-      const w = logs.length ? logs[logs.length - 1].weight : (ex.startWeight || 0);
+      const w = logs.length ? logs[logs.length - 1].weight : 0;
       $('weightInput').value = w;
     }
   }
@@ -2307,15 +2290,24 @@ img, video, canvas, svg { max-width: 100%; }
     p.classList.add('active');
     $('repsRow').dataset.value = p.dataset.v;
   });
+  $('setsRow').addEventListener('click', (e) => {
+    const p = e.target.closest('.po-reps-pill');
+    if (!p) return;
+    $('setsRow').querySelectorAll('.po-reps-pill').forEach(x => x.classList.remove('active'));
+    p.classList.add('active');
+    $('setsRow').dataset.value = p.dataset.v;
+  });
   $('logBtn').addEventListener('click', () => {
     const ex = getCurrentEx();
     if (!ex) return;
+    const sets = parseInt($('setsRow').dataset.value, 10) || 0;
+    if (sets <= 0) { alert('Pick a set count.'); return; }
     const reps = parseInt($('repsRow').dataset.value, 10) || 0;
     if (reps <= 0) { alert('Pick a rep count.'); return; }
     const w = ex.bw ? 0 : (parseFloat($('weightInput').value) || 0);
     if (!ex.bw && w <= 0) { alert('Enter a weight.'); return; }
     const arr = state.logs[ex.id] || [];
-    arr.push({ weight: w, reps: reps, date: new Date().toISOString() });
+    arr.push({ weight: w, sets: sets, reps: reps, date: new Date().toISOString() });
     state.logs[ex.id] = arr;
     saveState(); renderAll();
     // Strength changed → composition estimate may shift
@@ -2331,21 +2323,11 @@ img, video, canvas, svg { max-width: 100%; }
   // EXERCISE MODAL (add / edit)
   // ============================================================
   let editingExId = null;
-  let modalGym = null, modalDay = null;
+  let modalDay = null;
   function renderModalSegs() {
-    $('exGymSeg').innerHTML = state.gyms.map(g =>
-      '<button data-gym="' + g.id + '" class="' + (modalGym === g.id ? 'active' : '') + '">' + escape(g.name) + '</button>'
-    ).join('') + '<button data-gym="both" class="' + (modalGym === 'both' ? 'active' : '') + '">Both</button>';
     $('exDaySeg').innerHTML = state.days.map(d =>
       '<button data-day="' + d.id + '" class="' + (modalDay === d.id ? 'active' : '') + '">' + escape(d.name) + '</button>'
     ).join('');
-    $('exGymSeg').querySelectorAll('button').forEach(b => {
-      b.addEventListener('click', () => {
-        modalGym = b.dataset.gym;
-        $('exGymSeg').querySelectorAll('button').forEach(x => x.classList.remove('active'));
-        b.classList.add('active');
-      });
-    });
     $('exDaySeg').querySelectorAll('button').forEach(b => {
       b.addEventListener('click', () => {
         modalDay = b.dataset.day;
@@ -2360,7 +2342,6 @@ img, video, canvas, svg { max-width: 100%; }
     $('exDelete').style.display = mode === 'edit' ? 'block' : 'none';
     if (mode === 'edit') {
       $('exName').value = ex.name;
-      modalGym = ex.gym;
       modalDay = ex.day;
       $('exBw').checked = !!ex.bw;
       $('exStartWeight').value = ex.startWeight || 0;
@@ -2369,7 +2350,6 @@ img, video, canvas, svg { max-width: 100%; }
       $('exStep').value = ex.step;
     } else {
       $('exName').value = '';
-      modalGym = state.filterGym;
       modalDay = state.filterDay;
       $('exBw').checked = false;
       $('exStartWeight').value = 20;
@@ -2416,7 +2396,6 @@ img, video, canvas, svg { max-width: 100%; }
       const ex = Object.assign({ id: uid() }, data);
       state.exercises.push(ex);
       state.currentEx = ex.id;
-      state.filterGym = (modalGym === 'both') ? state.filterGym : modalGym;
       state.filterDay = modalDay;
     }
     saveState();
@@ -2541,32 +2520,12 @@ img, video, canvas, svg { max-width: 100%; }
     $('setUnitsSeg').querySelectorAll('button').forEach(b => {
       b.classList.toggle('active', b.dataset.u === state.units);
     });
-    $('setGyms').innerHTML = state.gyms.map((g, i) =>
-      '<div class="po-set-row" data-i="' + i + '">'
-      + '<input type="text" value="' + escape(g.name) + '" data-field="name" placeholder="Gym name">'
-      + '<button class="po-mini-btn" data-action="del" aria-label="Delete">×</button>'
-      + '</div>'
-    ).join('');
     $('setDays').innerHTML = state.days.map((d, i) =>
       '<div class="po-set-row" data-i="' + i + '">'
       + '<input type="text" value="' + escape(d.name) + '" data-field="name" placeholder="Day name">'
       + '<button class="po-mini-btn" data-action="del" aria-label="Delete">×</button>'
       + '</div>'
     ).join('');
-    $('setGyms').querySelectorAll('.po-set-row').forEach(row => {
-      const i = parseInt(row.dataset.i, 10);
-      row.querySelector('input').addEventListener('input', e => {
-        state.gyms[i].name = e.target.value;
-        saveState();
-      });
-      row.querySelector('[data-action="del"]').addEventListener('click', () => {
-        if (state.gyms.length <= 1) { alert('You need at least one gym.'); return; }
-        if (!confirm('Remove "' + state.gyms[i].name + '"? Exercises tagged to this gym will become invisible until you reassign them.')) return;
-        state.gyms.splice(i, 1);
-        if (!state.gyms.find(g => g.id === state.filterGym)) state.filterGym = state.gyms[0].id;
-        saveState(); renderSettings(); renderAll();
-      });
-    });
     $('setDays').querySelectorAll('.po-set-row').forEach(row => {
       const i = parseInt(row.dataset.i, 10);
       row.querySelector('input').addEventListener('input', e => {
@@ -2597,13 +2556,6 @@ img, video, canvas, svg { max-width: 100%; }
       b.classList.add('active');
       if (typeof wtRender === 'function') wtRender();
     });
-  });
-  $('setAddGym').addEventListener('click', () => {
-    const name = (prompt('New gym name:') || '').trim();
-    if (!name) return;
-    const id = 'g_' + Date.now();
-    state.gyms.push({ id, name });
-    saveState(); renderSettings(); renderAll();
   });
   $('setAddDay').addEventListener('click', () => {
     const name = (prompt('New day name:') || '').trim();
