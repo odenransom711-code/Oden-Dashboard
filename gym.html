@@ -23,25 +23,18 @@ const CONFIG = {
   // Weight unit shown everywhere. "kg" or "lb".
   units: "kg",
 
-  // Gyms you train at. Add as many as you want.
-  // `id` must be a short unique slug (no spaces). `name` is what people see.
-  gyms: [
-    { id: "home",  name: "Home Gym" },
-    { id: "comm",  name: "Commercial Gym" }
-  ],
-
-  // Training split. Most people use Push/Pull/Legs but you can rename
-  // these to "Upper", "Lower", "Full Body", "Day A", anything.
+  // Training split. Pick the day type when you log a session — rename
+  // these in Settings if you want different categories.
   days: [
-    { id: "push", name: "Push" },
-    { id: "pull", name: "Pull" },
-    { id: "legs", name: "Legs" }
+    { id: "upper",  name: "Upper" },
+    { id: "lower",  name: "Lower" },
+    { id: "cardio", name: "Cardio" }
   ],
 
   // Split rotation — the order your training days cycle through. Use day
   // ids from `days` above, plus "rest" for off-days. The pill at the top
   // of the app reads this + splitAnchor to compute "what day is today".
-  splitRotation: ["push", "pull", "legs", "rest"],
+  splitRotation: ["upper", "lower", "cardio", "rest"],
 
   // Anchor: pair a real calendar date with which split day fell on it.
   // The rotation advances from this point. Set `date` to a recent day
@@ -52,10 +45,11 @@ const CONFIG = {
     splitId: "rest"
   },
 
-  // Progression rule: hit this many reps on the top set → coach tells you
-  // to add weight next session. Lower this to be more aggressive (e.g. 6),
-  // raise it for more volume bias (e.g. 10).
-  upgradeAtReps: 8,
+  // Fixed weight increment the coach suggests when it recommends adding
+  // weight (used instead of a per-exercise step now that logging is
+  // simpler — kg used if units is "kg", lb used if units is "lb").
+  upgradeStepKg: 2.5,
+  upgradeStepLb: 5,
 
   // Composition estimate (optional, for the weight chart).
   // Estimates how much of recent weight change is muscle vs fat by
@@ -68,27 +62,20 @@ const CONFIG = {
   },
 
   // Starter exercise list. Each one needs:
-  //   name        — what shows in the dropdown
-  //   gym         — one of the gym ids above, or "both"
-  //   day         — one of the day ids above
-  //   repMin      — bottom of your target rep range
-  //   repMax      — top of your target rep range
-  //   step        — how much weight you add when progressing (kg/lb)
-  //   startWeight — starting weight (ignored when bw: true)
-  //   bw          — true for bodyweight movements (logs reps only)
+  //   name — what shows in the dropdown
+  //   day  — one of the day ids above
+  //   bw   — true for bodyweight movements (logs reps only, no weight)
   //
   // First-run defaults. Once a user logs anything, they edit through
   // the in-app + / gear buttons; this block stays as the seed.
   defaultExercises: [
-    { name: "Bench press",     gym: "comm", day: "push", repMin: 5, repMax: 8,  step: 2.5, startWeight: 60 },
-    { name: "Overhead press",  gym: "comm", day: "push", repMin: 5, repMax: 8,  step: 2.5, startWeight: 35 },
-    { name: "Tricep pushdown", gym: "comm", day: "push", repMin: 8, repMax: 12, step: 2.5, startWeight: 25 },
-    { name: "Pull-ups",        gym: "both", day: "pull", repMin: 5, repMax: 10, step: 1,   startWeight: 0, bw: true },
-    { name: "Barbell row",     gym: "comm", day: "pull", repMin: 6, repMax: 10, step: 2.5, startWeight: 50 },
-    { name: "Bicep curl",      gym: "comm", day: "pull", repMin: 8, repMax: 12, step: 1.25,startWeight: 15 },
-    { name: "Back squat",      gym: "comm", day: "legs", repMin: 5, repMax: 8,  step: 5,   startWeight: 80 },
-    { name: "Romanian deadlift", gym: "comm", day: "legs", repMin: 6, repMax: 10, step: 5, startWeight: 60 },
-    { name: "Leg press",       gym: "comm", day: "legs", repMin: 8, repMax: 12, step: 5,   startWeight: 100 }
+    { name: "Bench press",       day: "upper" },
+    { name: "Overhead press",    day: "upper" },
+    { name: "Pull-ups",          day: "upper", bw: true },
+    { name: "Back squat",        day: "lower" },
+    { name: "Romanian deadlift", day: "lower" },
+    { name: "Leg press",         day: "lower" },
+    { name: "Running",           day: "cardio", bw: true }
   ]
 };
 </script>
@@ -1735,11 +1722,9 @@ img, video, canvas, svg { max-width: 100%; }
   function normalize(s) {
     s = s || {};
     s.units = s.units || CONFIG.units || 'kg';
-    s.gyms  = (Array.isArray(s.gyms)  && s.gyms.length)  ? s.gyms  : CONFIG.gyms.slice();
     s.days  = (Array.isArray(s.days)  && s.days.length)  ? s.days  : CONFIG.days.slice();
     s.exercises = Array.isArray(s.exercises) ? s.exercises : buildDefaultExercises();
     s.logs = (s.logs && typeof s.logs === 'object') ? s.logs : {};
-    s.filterGym = s.filterGym || s.gyms[0].id;
     s.filterDay = s.filterDay || s.days[0].id;
     // Split rotation lives in state so the user can edit it via the pill modal.
     // Stored as a plain array of names (e.g. ["Push", "Pull", "Legs", "Rest"]).
@@ -1779,13 +1764,11 @@ img, video, canvas, svg { max-width: 100%; }
   const $ = (id) => document.getElementById(id);
   function unit() { return state.units; }
   function uid() { return 'ex_' + Date.now() + '_' + Math.floor(Math.random() * 9999); }
-  function gymName(id) { const g = state.gyms.find(x => x.id === id); return g ? g.name : id; }
   function dayName(id) { const d = state.days.find(x => x.id === id); return d ? d.name : id; }
   function estimate1RM(w, r) { if (r < 2) return w; return w * (1 + r / 30); }
   function roundToStep(v, s) { return Math.round(v / s) * s; }
   function getFiltered() {
-    return state.exercises.filter(e =>
-      (e.gym === state.filterGym || e.gym === 'both') && e.day === state.filterDay);
+    return state.exercises.filter(e => e.day === state.filterDay);
   }
   function getCurrentEx() {
     const f = getFiltered();
