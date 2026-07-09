@@ -352,10 +352,6 @@ img, video, canvas, svg { max-width: 100%; }
 }
 
 /* ----- Weight + Reps inputs ----- */
-.po-log-grid {
-  display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 14px;
-}
-.po-log-grid.po-bw-mode { grid-template-columns: 1fr; }
 .po-log-grid-3 {
   display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-bottom: 14px;
 }
@@ -693,7 +689,6 @@ img, video, canvas, svg { max-width: 100%; }
   .po-btn-icon { width: 38px; height: 38px; min-width: 38px; }
 
   /* Stack weight + reps vertically so every rep button fits the screen */
-  .po-log-grid { grid-template-columns: 1fr; gap: 14px; }
   .po-log-grid-3 { grid-template-columns: 1fr; gap: 14px; }
   .po-reps-row { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 5px; }
   .po-reps-pill { padding: 14px 0; font-size: 14px; min-width: 0; }
@@ -1999,10 +1994,8 @@ img, video, canvas, svg { max-width: 100%; }
     splitEl.classList.toggle('is-rest', isRestName(split.name));
   }
 
-  // Build the rep buttons based on the current exercise's repMin/repMax.
-  // Always spans repMin → repMax + 2 (a small buffer for over-performing
-  // sets that trigger the upgrade signal), capped at 16 buttons total so
-  // wide ranges don't break the mobile layout.
+  // Build the rep buttons across a fixed 1-20 range — no longer tied to
+  // a per-exercise rep-range configuration (exercises don't carry one).
   function renderRepsRow() {
     const row = document.getElementById('repsRow');
     if (!row) return;
@@ -2082,14 +2075,18 @@ img, video, canvas, svg { max-width: 100%; }
 
   function summarizeDay(daySets) {
     // daySets: [{ex, log}]. Group by exercise, return {sets: N, vol: kg, perEx: [...]}.
+    // Each `log` is one session entry ({weight, sets, reps, date}), not one set —
+    // `e.sets` below stays the list of session entries (used for top-weight/top-reps
+    // display), while `e.setCount` and totalSets sum the actual sets logged.
     const byEx = {};
     daySets.forEach(({ex, log}) => {
-      if (!byEx[ex.id]) byEx[ex.id] = { ex, sets: [], vol: 0 };
+      if (!byEx[ex.id]) byEx[ex.id] = { ex, sets: [], vol: 0, setCount: 0 };
       byEx[ex.id].sets.push(log);
-      byEx[ex.id].vol += (log.weight || 0) * (log.reps || 0);
+      byEx[ex.id].setCount += (log.sets || 1);
+      byEx[ex.id].vol += (log.weight || 0) * (log.reps || 0) * (log.sets || 1);
     });
     const perEx = Object.values(byEx);
-    const totalSets = perEx.reduce((s, e) => s + e.sets.length, 0);
+    const totalSets = perEx.reduce((s, e) => s + e.setCount, 0);
     const totalVol = perEx.reduce((s, e) => s + e.vol, 0);
     return { perEx, totalSets, totalVol };
   }
@@ -2122,8 +2119,8 @@ img, video, canvas, svg { max-width: 100%; }
           ? 'top ' + Math.max.apply(null, e.sets.map(s => s.reps)) + ' reps'
           : 'top ' + Math.max.apply(null, e.sets.map(s => s.weight)) + u;
         const meta = e.ex.bw
-          ? (e.sets.length + ' set' + (e.sets.length === 1 ? '' : 's') + ' · ' + top)
-          : (e.sets.length + ' set' + (e.sets.length === 1 ? '' : 's') + ' · ' + top + ' · ' + Math.round(e.vol) + u + ' total');
+          ? (e.setCount + ' set' + (e.setCount === 1 ? '' : 's') + ' · ' + top)
+          : (e.setCount + ' set' + (e.setCount === 1 ? '' : 's') + ' · ' + top + ' · ' + Math.round(e.vol) + u + ' total');
         return '<li class="po-tw-row">'
           + '<span class="po-tw-row-name">' + escape(e.ex.name) + '</span>'
           + '<span class="po-tw-row-meta">' + meta + '</span>'
@@ -2465,7 +2462,7 @@ img, video, canvas, svg { max-width: 100%; }
   });
 
   // ============================================================
-  // SETTINGS MODAL (gyms, days, units, data)
+  // SETTINGS MODAL (days, units, data)
   // ============================================================
   function renderSettings() {
     $('setUnitsSeg').querySelectorAll('button').forEach(b => {
@@ -2762,7 +2759,7 @@ img, video, canvas, svg { max-width: 100%; }
         logs.forEach(l => {
           if (new Date(l.date) >= start) {
             workoutDays.add(l.date.slice(0, 10));
-            totalVolumeInWindow += (l.weight || 0) * (l.reps || 0);
+            totalVolumeInWindow += (l.weight || 0) * (l.reps || 0) * (l.sets || 1);
           }
         });
         return;
@@ -2771,7 +2768,7 @@ img, video, canvas, svg { max-width: 100%; }
       const before = logs.filter(l => new Date(l.date) < start);
       inWin.forEach(l => {
         workoutDays.add(l.date.slice(0, 10));
-        totalVolumeInWindow += (l.weight || 0) * (l.reps || 0);
+        totalVolumeInWindow += (l.weight || 0) * (l.reps || 0) * (l.sets || 1);
       });
       if (!inWin.length || !before.length) return;
       const avg = arr => arr.reduce((s, l) => s + estimate1RM(l.weight, l.reps), 0) / arr.length;
