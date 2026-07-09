@@ -1764,32 +1764,31 @@ img, video, canvas, svg { max-width: 100%; }
   function getLogs() { return (state.logs[state.currentEx] || []).slice(); }
 
   // Prescription engine — "what should I do next session?"
-  // Upgrade trigger: hits CONFIG.upgradeAtReps (default 8) OR the
-  // exercise's repMax, whichever fires first. So a 5-8 lifter hits
-  // upgrade at 8; a 6-12 lifter ALSO hits it at 8 instead of grinding
-  // out 12 reps before adding weight.
+  // For weighted exercises: if the same weight held for 2+ sessions,
+  // suggest upgrading by CONFIG.upgradeStepKg/Lb.
+  // For bodyweight: if the same reps achieved for 2+ sessions, suggest +1 rep.
   function getRx(ex, logs) {
     if (!logs.length) return null;
     const last = logs[logs.length - 1];
-    const { weight, reps } = last;
-    const { repMin, repMax, step, bw } = ex;
-    const upgradeAt = Math.min(CONFIG.upgradeAtReps || 8, repMax);
+    const { weight, sets, reps } = last;
+    if (ex.bw) {
+      let stuck = 0;
+      for (let i = logs.length - 1; i >= 0; i--) {
+        if (logs[i].reps === reps) stuck++; else break;
+      }
+      if (stuck >= 2) return { type: 'up', weight: 0, sets: sets, reps: reps + 1, tag: 'Add a rep', reason: 'You hit ' + reps + ' reps for ' + stuck + ' sessions in a row — push for ' + (reps + 1) + ' next time.', bw: true };
+      return { type: 'hold', weight: 0, sets: sets, reps: reps, tag: 'Repeat', reason: 'Repeat ' + sets + ' × ' + reps + ' next session.', bw: true };
+    }
     let stuck = 0;
     for (let i = logs.length - 1; i >= 0; i--) {
       if (logs[i].weight === weight) stuck++; else break;
     }
-    if (bw) {
-      if (reps >= upgradeAt) return { type: 'up', weight: 0, reps: reps + 1, tag: 'Push for more', reason: reps + ' reps — strong. Push for ' + (reps + 1) + ' next time.', bw: true };
-      if (reps >= repMin) return { type: 'hold', weight: 0, reps: reps + 1, tag: 'Add a rep', reason: reps + ' reps. Push for ' + (reps + 1) + ' next session.', bw: true };
-      return { type: 'hold', weight: 0, reps: repMin, tag: 'Repeat', reason: reps + ' reps fell short. Repeat until you hit ' + repMin + '+.', bw: true };
+    const step = unit() === 'lb' ? (CONFIG.upgradeStepLb || 5) : (CONFIG.upgradeStepKg || 2.5);
+    if (stuck >= 2) {
+      const nextWeight = weight + step;
+      return { type: 'up', weight: nextWeight, sets: sets, reps: reps, tag: 'Add weight', reason: 'You held ' + weight + unit() + ' for ' + stuck + ' sessions — try ' + nextWeight + unit() + ' next time.' };
     }
-    if (stuck >= 3 && reps < repMin) {
-      const dl = roundToStep(weight * 0.9, step);
-      return { type: 'down', weight: dl, reps: repMax, tag: 'Deload', reason: 'Stuck at ' + weight + unit() + ' for ' + stuck + ' sessions. Drop 10%, reset, build back cleaner.' };
-    }
-    if (reps >= upgradeAt) return { type: 'up', weight: weight + step, reps: repMin, tag: 'Add weight', reason: 'You hit ' + reps + ' reps — time to add ' + step + unit() + '. Expect ' + repMin + '-' + (repMin + 1) + ' next session.' };
-    if (reps >= repMin && reps < upgradeAt) return { type: 'hold', weight: weight, reps: reps + 1, tag: 'Add a rep', reason: reps + ' reps in target. Stay at ' + weight + unit() + ', push for ' + (reps + 1) + '.' };
-    return { type: 'hold', weight: weight, reps: repMin, tag: 'Repeat', reason: reps + ' reps short of ' + repMin + '-' + upgradeAt + '. Repeat ' + weight + unit() + ' until you hit ' + repMin + '+ clean.' };
+    return { type: 'hold', weight: weight, sets: sets, reps: reps, tag: 'Repeat', reason: 'Repeat ' + sets + ' × ' + reps + ' @ ' + weight + unit() + ' next session.' };
   }
 
   // ============================================================
@@ -1825,9 +1824,8 @@ img, video, canvas, svg { max-width: 100%; }
     noMsg.style.display = 'none';
     if (!f.find(e => e.id === state.currentEx)) state.currentEx = f[0].id;
     sel.innerHTML = f.map(e => {
-      const wLbl = e.bw ? ' · BW' : (e.startWeight ? ' · ' + e.startWeight + unit() : '');
-      const sh = e.gym === 'both' ? ' ★' : '';
-      return '<option value="' + e.id + '"' + (e.id === state.currentEx ? ' selected' : '') + '>' + escape(e.name) + wLbl + sh + '</option>';
+      const wLbl = e.bw ? ' · BW' : '';
+      return '<option value="' + e.id + '"' + (e.id === state.currentEx ? ' selected' : '') + '>' + escape(e.name) + wLbl + '</option>';
     }).join('');
   }
   function renderForm() {
@@ -1857,7 +1855,7 @@ img, video, canvas, svg { max-width: 100%; }
     const logs = ex ? getLogs() : [];
     if (!ex || !logs.length) { wrap.classList.remove('show'); return; }
     const last = logs[logs.length - 1];
-    const setStr = ex.bw ? (last.reps + ' reps') : (last.weight + unit() + ' × ' + last.reps);
+    const setStr = ex.bw ? (last.sets + ' × ' + last.reps + ' reps') : (last.sets + ' × ' + last.reps + ' @ ' + last.weight + unit());
     const d = new Date(last.date);
     const da = Math.floor((Date.now() - d.getTime()) / 86400000);
     const ago = da === 0 ? 'today' : da === 1 ? 'yesterday' : da + ' days ago';
@@ -1868,23 +1866,16 @@ img, video, canvas, svg { max-width: 100%; }
   function renderRx() {
     const wrap = $('rxWrap');
     const ex = getCurrentEx();
-    if (!ex) { wrap.innerHTML = '<div class="po-rx-empty">Pick a gym and day above.</div>'; return; }
+    if (!ex) { wrap.innerHTML = '<div class="po-rx-empty">Pick a day type above.</div>'; return; }
     const logs = getLogs();
     const rx = getRx(ex, logs);
     if (!rx) {
-      const sw = ex.startWeight, sr = ex.repMin;
-      const head = ex.bw
-        ? '<span class="po-accent">' + sr + '</span> reps'
-        : '<span class="po-accent">' + (sw || 0) + unit() + '</span> × ' + sr + ' reps';
-      const reason = ex.bw
-        ? 'Aim for ' + ex.repMin + '-' + ex.repMax + ' clean reps. Once you hit ' + ex.repMax + '+, push for more.'
-        : 'Hit ' + ex.repMin + '-' + ex.repMax + ' reps. Once logged, the coach will start prescribing.';
-      wrap.innerHTML = '<div class="po-rx-card"><div class="po-rx-label">' + escape(ex.name) + ' · starting point</div><div class="po-rx-headline">' + head + '</div><span class="po-rx-tag hold">Start here</span><p class="po-rx-reason">' + reason + '</p></div>';
+      wrap.innerHTML = '<div class="po-rx-card"><div class="po-rx-label">' + escape(ex.name) + ' · new exercise</div><div class="po-rx-headline">No sessions yet</div><span class="po-rx-tag hold">Start here</span><p class="po-rx-reason">Log your first session below to start tracking.</p></div>';
       return;
     }
     const head = rx.bw
-      ? '<span class="po-accent">' + rx.reps + '</span> reps'
-      : '<span class="po-accent">' + rx.weight + unit() + '</span> × ' + rx.reps + ' reps';
+      ? '<span class="po-accent">' + rx.sets + '</span> × ' + rx.reps + ' reps'
+      : '<span class="po-accent">' + rx.weight + unit() + '</span> × ' + rx.sets + ' × ' + rx.reps;
     wrap.innerHTML = '<div class="po-rx-card po-rx-' + rx.type + '"><div class="po-rx-label">' + escape(ex.name) + '</div><div class="po-rx-headline">' + head + '</div><span class="po-rx-tag ' + rx.type + '">' + rx.tag + '</span><p class="po-rx-reason">' + rx.reason + '</p></div>';
   }
   function renderStats() {
@@ -1951,7 +1942,7 @@ img, video, canvas, svg { max-width: 100%; }
     wrap.innerHTML = logs.slice(0, 12).map((l, i) => {
       const d = new Date(l.date);
       const dStr = (d.getMonth() + 1) + '/' + d.getDate();
-      const setStr = ex.bw ? (l.reps + ' reps') : (l.weight + unit() + ' × ' + l.reps);
+      const setStr = ex.bw ? (l.sets + ' × ' + l.reps + ' reps') : (l.sets + ' × ' + l.reps + ' @ ' + l.weight + unit());
       const realIdx = logs.length - 1 - i; // since we reversed
       return '<div class="po-hist-row">'
         + '<div class="po-hist-date">' + dStr + '</div>'
@@ -2255,12 +2246,14 @@ img, video, canvas, svg { max-width: 100%; }
   $('weightDownBtn').addEventListener('click', () => {
     const ex = getCurrentEx(); if (!ex || ex.bw) return;
     const w = parseFloat($('weightInput').value) || 0;
-    $('weightInput').value = Math.max(0, w - (ex.step || 2.5));
+    const step = unit() === 'lb' ? (CONFIG.upgradeStepLb || 5) : (CONFIG.upgradeStepKg || 2.5);
+    $('weightInput').value = Math.max(0, w - step);
   });
   $('weightUpBtn').addEventListener('click', () => {
     const ex = getCurrentEx(); if (!ex || ex.bw) return;
     const w = parseFloat($('weightInput').value) || 0;
-    $('weightInput').value = w + (ex.step || 2.5);
+    const step = unit() === 'lb' ? (CONFIG.upgradeStepLb || 5) : (CONFIG.upgradeStepKg || 2.5);
+    $('weightInput').value = w + step;
   });
   // Delegated click handler — reps row is regenerated per exercise via
   // renderRepsRow(), so we listen on the container rather than the
