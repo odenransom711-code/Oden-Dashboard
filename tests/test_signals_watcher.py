@@ -261,3 +261,19 @@ def test_uninstall_unloads_and_removes(monkeypatch, tmp_path):
     signals_watcher.uninstall()
     assert not _os.path.exists(plist_path)
     assert calls == [['launchctl', 'unload', plist_path]]
+
+
+def test_check_and_run_handles_supabase_read_failure_gracefully(monkeypatch, capsys):
+    def failing_get(key):
+        raise OSError('nodename nor servname provided, or not known')
+
+    monkeypatch.setattr(signals_watcher, 'get_app_state_row', failing_get)
+    ran = []
+    monkeypatch.setattr(signals_watcher, 'run_weekly_signals_script', lambda: ran.append(True))
+
+    # Must not raise.
+    signals_watcher.check_and_run()
+
+    assert ran == []
+    err = capsys.readouterr().err
+    assert 'ERROR' in err

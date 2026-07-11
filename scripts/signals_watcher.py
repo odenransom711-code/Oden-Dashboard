@@ -165,24 +165,27 @@ def run_weekly_signals_script():
 
 
 def check_and_run():
-    now_et = datetime.now(ZoneInfo('America/New_York'))
-    state = get_app_state_row('stockpicks')
-    refresh_state = get_app_state_row('stockpicks_refresh')
-
-    if not (is_weekly_due(state, now_et) or is_manual_due(state, refresh_state)):
-        print('Not due; nothing to do.')
-        return
-
-    if not is_lock_stale_or_absent():
-        print('A scan already appears to be running; skipping this cycle.')
-        return
-
-    acquire_lock()
     try:
-        print('Running weekly_signals.py...')
-        run_weekly_signals_script()
-    finally:
-        release_lock()
+        now_et = datetime.now(ZoneInfo('America/New_York'))
+        state = get_app_state_row('stockpicks')
+        refresh_state = get_app_state_row('stockpicks_refresh')
+
+        if not (is_weekly_due(state, now_et) or is_manual_due(state, refresh_state)):
+            print('Not due; nothing to do.')
+            return
+
+        if not is_lock_stale_or_absent():
+            print('A scan already appears to be running; skipping this cycle.')
+            return
+
+        acquire_lock()
+        try:
+            print('Running weekly_signals.py...')
+            run_weekly_signals_script()
+        finally:
+            release_lock()
+    except Exception as e:
+        print('ERROR: %s' % e, file=sys.stderr)
 
 
 PLIST_TEMPLATE = """<?xml version="1.0" encoding="UTF-8"?>
