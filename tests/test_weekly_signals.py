@@ -137,3 +137,108 @@ def test_parse_scan_output_signal_missing_strike_line_does_not_borrow_next_signa
     assert result['signals'][1]['ticker'] == 'NVDA'
     assert result['signals'][1]['strike'] == 140
     assert result['signals'][1]['expiration'] == '2026-07-24'
+
+
+import scripts.weekly_signals as weekly_signals
+
+
+def test_main_dry_run_prints_payload_without_pushing(monkeypatch, capsys):
+    monkeypatch.setattr(weekly_signals, 'clone_repo', lambda dest: None)
+    monkeypatch.setattr(weekly_signals, 'ensure_venv', lambda: '/fake/python')
+    monkeypatch.setattr(
+        weekly_signals, 'run_scan',
+        lambda py, d: SAMPLE_STDOUT_ONE_SIGNAL,
+    )
+    pushed = []
+    monkeypatch.setattr(
+        weekly_signals, 'push_to_supabase',
+        lambda payload: pushed.append(payload),
+    )
+
+    exit_code = weekly_signals.main(['--dry-run'])
+
+    assert exit_code == 0
+    assert pushed == []
+    out = capsys.readouterr().out
+    assert '"regime": "BULL"' in out
+    assert '"ticker": "HD"' in out
+
+
+def test_main_pushes_regime_and_empty_signals_on_success(monkeypatch):
+    monkeypatch.setattr(weekly_signals, 'clone_repo', lambda dest: None)
+    monkeypatch.setattr(weekly_signals, 'ensure_venv', lambda: '/fake/python')
+    monkeypatch.setattr(
+        weekly_signals, 'run_scan',
+        lambda py, d: SAMPLE_STDOUT_ZERO_SIGNALS,
+    )
+    pushed = []
+    monkeypatch.setattr(
+        weekly_signals, 'push_to_supabase',
+        lambda payload: pushed.append(payload),
+    )
+
+    exit_code = weekly_signals.main([])
+
+    assert exit_code == 0
+    assert len(pushed) == 1
+    assert pushed[0]['regime'] == 'NEUTRAL'
+    assert pushed[0]['signals'] == []
+    assert 'updatedAt' in pushed[0]
+
+
+def test_main_does_not_push_when_scan_fails(monkeypatch):
+    monkeypatch.setattr(weekly_signals, 'clone_repo', lambda dest: None)
+    monkeypatch.setattr(weekly_signals, 'ensure_venv', lambda: '/fake/python')
+
+    def failing_scan(py, d):
+        raise RuntimeError('options_now.py exited with code 1')
+
+    monkeypatch.setattr(weekly_signals, 'run_scan', failing_scan)
+    pushed = []
+    monkeypatch.setattr(
+        weekly_signals, 'push_to_supabase',
+        lambda payload: pushed.append(payload),
+    )
+
+    exit_code = weekly_signals.main([])
+
+    assert exit_code == 1
+    assert pushed == []
+
+
+def test_main_does_not_push_when_clone_fails(monkeypatch):
+    def failing_clone(dest):
+        raise RuntimeError('git clone failed')
+
+    monkeypatch.setattr(weekly_signals, 'clone_repo', failing_clone)
+    pushed = []
+    monkeypatch.setattr(
+        weekly_signals, 'push_to_supabase',
+        lambda payload: pushed.append(payload),
+    )
+
+    exit_code = weekly_signals.main([])
+
+    assert exit_code == 1
+    assert pushed == []
+
+
+def test_main_cleans_up_clone_dir_even_on_failure(monkeypatch, tmp_path):
+    fake_dir = str(tmp_path / 'clone')
+    import os as _os
+    _os.makedirs(fake_dir)
+    monkeypatch.setattr(
+        weekly_signals.tempfile, 'mkdtemp',
+        lambda prefix=None: fake_dir,
+    )
+    monkeypatch.setattr(weekly_signals, 'clone_repo', lambda dest: None)
+    monkeypatch.setattr(weekly_signals, 'ensure_venv', lambda: '/fake/python')
+
+    def failing_scan(py, d):
+        raise RuntimeError('boom')
+
+    monkeypatch.setattr(weekly_signals, 'run_scan', failing_scan)
+
+    weekly_signals.main([])
+
+    assert not _os.path.exists(fake_dir)

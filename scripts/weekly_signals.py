@@ -78,3 +78,124 @@ def parse_scan_output(stdout, today=None):
             'expiration': expiration,
         })
     return {'regime': regime, 'signals': signals}
+
+
+# ============================================================
+# Orchestration — venv setup, clone, subprocess run, Supabase
+# push, and the CLI entry point. Everything above this line is
+# pure and unit-tested directly; everything below is I/O and is
+# tested via mocks (see tests/test_weekly_signals.py).
+# ============================================================
+import argparse
+import json
+import os
+import shutil
+import subprocess
+import sys
+import tempfile
+import urllib.request
+from datetime import datetime, timezone
+
+REPO_URL = 'https://github.com/adv-andrew/mcmc-cuda-model.git'
+VENV_DIR = os.path.expanduser('~/.oden-dashboard-signals-venv')
+VENV_DEPS = ['numpy', 'pandas', 'yfinance', 'scipy', 'pytz', 'pyyaml']
+SUPABASE_URL = 'https://srajryooffirbroltjmg.supabase.co'
+SUPABASE_KEY = 'sb_publishable_5142ZwTLF_DkSVRzciNuRA_bHwRAu4c'
+
+
+def ensure_venv():
+    """Create the dedicated venv if it doesn't exist yet, and make sure the
+    required CPU-only dependencies are installed (fast/idempotent when
+    already satisfied). Returns the path to the venv's python executable."""
+    venv_python = os.path.join(VENV_DIR, 'bin', 'python3')
+    if not os.path.exists(venv_python):
+        subprocess.run([sys.executable, '-m', 'venv', VENV_DIR], check=True)
+    subprocess.run(
+        [venv_python, '-m', 'pip', 'install', '-q'] + VENV_DEPS,
+        check=True,
+    )
+    return venv_python
+
+
+def clone_repo(dest_dir):
+    subprocess.run(
+        ['git', 'clone', '--depth', '1', REPO_URL, dest_dir],
+        check=True, capture_output=True, text=True,
+    )
+
+
+def run_scan(venv_python, repo_dir):
+    result = subprocess.run(
+        [venv_python, 'scripts/options_now.py'],
+        cwd=repo_dir, capture_output=True, text=True, timeout=300,
+    )
+    if result.returncode != 0:
+        raise RuntimeError(
+            'options_now.py exited with code %d\nstderr:\n%s'
+            % (result.returncode, result.stderr)
+        )
+    return result.stdout
+
+
+def push_to_supabase(payload):
+    body = json.dumps({
+        'key': 'stockpicks',
+        'data': payload,
+        'updated_at': datetime.now(timezone.utc).isoformat(),
+    }).encode('utf-8')
+    req = urllib.request.Request(
+        SUPABASE_URL + '/rest/v1/app_state?on_conflict=key',
+        data=body,
+        method='POST',
+        headers={
+            'apikey': SUPABASE_KEY,
+            'Authorization': 'Bearer ' + SUPABASE_KEY,
+            'Content-Type': 'application/json',
+            'Prefer': 'resolution=merge-duplicates',
+        },
+    )
+    with urllib.request.urlopen(req, timeout=30) as resp:
+        if resp.status >= 300:
+            raise RuntimeError('Supabase push failed with status %d' % resp.status)
+
+
+def main(argv=None):
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--dry-run', action='store_true')
+    parsed_args = parser.parse_args(argv)
+
+    clone_dir = tempfile.mkdtemp(prefix='mcmc-cuda-model-')
+    try:
+        print('Cloning %s...' % REPO_URL)
+        clone_repo(clone_dir)
+
+        print('Ensuring venv is ready...')
+        venv_python = ensure_venv()
+
+        print('Running options_now.py...')
+        stdout = run_scan(venv_python, clone_dir)
+
+        print('Parsing output...')
+        parsed = parse_scan_output(stdout)
+        payload = {
+            'updatedAt': datetime.now(timezone.utc).isoformat(),
+            'regime': parsed['regime'],
+            'signals': parsed['signals'],
+        }
+
+        if parsed_args.dry_run:
+            print(json.dumps(payload, indent=2))
+        else:
+            print('Pushing to Supabase...')
+            push_to_supabase(payload)
+            print('Done.')
+        return 0
+    except Exception as e:
+        print('ERROR: %s' % e, file=sys.stderr)
+        return 1
+    finally:
+        shutil.rmtree(clone_dir, ignore_errors=True)
+
+
+if __name__ == '__main__':
+    sys.exit(main())
