@@ -1031,6 +1031,14 @@ html, body { scrollbar-width: none; -ms-overflow-style: none; }
 .sig-regime-badge.bull { background: rgba(107,227,164,0.14); color: var(--success); }
 .sig-regime-badge.bear { background: rgba(255,107,107,0.14); color: var(--danger); }
 .sig-regime-badge.neutral { background: rgba(255,255,255,0.06); color: var(--text-tertiary); }
+.sig-refresh-row {
+  display: flex; align-items: center; gap: 10px;
+  margin-bottom: 14px; flex-wrap: wrap;
+}
+.sig-refresh-status {
+  font-size: 11px; color: var(--text-tertiary);
+}
+.sig-refresh-status.stuck { color: var(--warning); }
 .sig-card {
   display: flex; align-items: center; gap: 14px;
   padding: 14px 16px; margin-bottom: 8px;
@@ -1781,6 +1789,11 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   <div class="sig-meta-row">
     <span class="sig-meta-updated" id="sigUpdated">—</span>
     <span class="sig-regime-badge" id="sigRegime" style="display:none"></span>
+  </div>
+
+  <div class="sig-refresh-row">
+    <button class="quick-add-btn" id="sigRefreshBtn" type="button">Refresh now</button>
+    <span class="sig-refresh-status" id="sigRefreshStatus"></span>
   </div>
 
   <div id="sigList"></div>
@@ -3469,8 +3482,54 @@ input[type="date"]::-webkit-calendar-picker-indicator {
     }).join('');
   }
 
+  const SIG_REFRESH_STUCK_MS = 20 * 60 * 1000; // 20 minutes
+
+  function renderRefreshStatus() {
+    const btn = document.getElementById('sigRefreshBtn');
+    const statusEl = document.getElementById('sigRefreshStatus');
+    if (!btn || !statusEl) return;
+
+    const state = storeGet('stockpicks_v1');
+    const refresh = storeGet('stockpicks_refresh_v1');
+    const updatedAt = state && state.updatedAt ? new Date(state.updatedAt).getTime() : null;
+    const requestedAt = refresh && refresh.requestedAt ? new Date(refresh.requestedAt).getTime() : null;
+
+    const pending = requestedAt != null && (updatedAt == null || requestedAt > updatedAt);
+    if (!pending) {
+      btn.disabled = false;
+      btn.textContent = 'Refresh now';
+      statusEl.textContent = '';
+      statusEl.classList.remove('stuck');
+      return;
+    }
+
+    const stuck = (Date.now() - requestedAt) > SIG_REFRESH_STUCK_MS;
+    if (stuck) {
+      btn.disabled = false;
+      btn.textContent = 'Refresh now';
+      statusEl.textContent = 'Still waiting — is your Mac on and awake?';
+      statusEl.classList.add('stuck');
+    } else {
+      btn.disabled = true;
+      btn.textContent = 'Refreshing...';
+      statusEl.textContent = 'Refresh requested — waiting for your Mac...';
+      statusEl.classList.remove('stuck');
+    }
+  }
+
+  const sigRefreshBtnEl = document.getElementById('sigRefreshBtn');
+  if (sigRefreshBtnEl) {
+    sigRefreshBtnEl.addEventListener('click', function () {
+      storeSet('stockpicks_refresh_v1', { requestedAt: new Date().toISOString() });
+      renderRefreshStatus();
+    });
+  }
+
   renderSignals();
+  renderRefreshStatus();
   window.renderSignals = renderSignals;
+  window.renderRefreshStatus = renderRefreshStatus;
+  setInterval(renderRefreshStatus, 30000);
 
 })();
 </script>
@@ -3497,6 +3556,20 @@ document.addEventListener('DOMContentLoaded', function () {
     syncedKeys: ['stockpicks_v1'],
     onApplied: function () {
       if (window.renderSignals) window.renderSignals();
+      if (window.renderRefreshStatus) window.renderRefreshStatus();
+    }
+  });
+});
+</script>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+  if (typeof initCloudSync !== 'function') return;
+  initCloudSync({
+    appKey: 'stockpicks_refresh',
+    syncedKeys: ['stockpicks_refresh_v1'],
+    onApplied: function () {
+      if (window.renderRefreshStatus) window.renderRefreshStatus();
     }
   });
 });
