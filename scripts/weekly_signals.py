@@ -62,6 +62,8 @@ def parse_scan_output(stdout, today=None):
         strike = None
         expiration = None
         for lookahead in lines[i + 1:i + 3]:
+            if SIGNAL_HEADER_RE.match(lookahead):
+                break
             se = STRIKE_EXP_RE.search(lookahead)
             if se:
                 strike = int(se.group(1))

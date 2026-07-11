@@ -117,3 +117,24 @@ def test_parse_scan_output_missing_regime_raises():
         assert False, 'expected ValueError'
     except ValueError:
         pass
+
+
+SAMPLE_STDOUT_SIGNAL_MISSING_STRIKE_LINE = """REGIME:    BULL MARKET
+
+#1 HD PUT | Confidence: 72/100 (HIGH)
+   Price: $402.10 | Vol: 34%
+#2 NVDA CALL | Confidence: 68/100 (MED)
+   Strike: $140 ATM | Exp: ~Jul 24
+   Price: $135.50 | Vol: 41%
+"""
+
+
+def test_parse_scan_output_signal_missing_strike_line_does_not_borrow_next_signals_data():
+    result = parse_scan_output(
+        SAMPLE_STDOUT_SIGNAL_MISSING_STRIKE_LINE, today=date(2026, 7, 6)
+    )
+    assert result['signals'][0]['ticker'] == 'HD'
+    assert result['signals'][0]['strike'] is None
+    assert result['signals'][0]['expiration'] is None
+    assert result['signals'][1]['ticker'] == 'NVDA'
+    assert result['signals'][1]['strike'] == 140
