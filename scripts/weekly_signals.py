@@ -182,12 +182,18 @@ def main(argv=None):
             'regime': parsed['regime'],
             'signals': parsed['signals'],
         }
+        # sync.js's client-side apply logic only copies keys from the
+        # Supabase row's `data` field that match a page's registered
+        # syncedKeys — finance.html registers syncedKeys: ['stockpicks_v1'],
+        # so the pushed data must be wrapped under that exact key or the
+        # Finance page will never see it.
+        wrapped = {'stockpicks_v1': payload}
 
         if parsed_args.dry_run:
-            print(json.dumps(payload, indent=2))
+            print(json.dumps(wrapped, indent=2))
         else:
             print('Pushing to Supabase...')
-            push_to_supabase(payload)
+            push_to_supabase(wrapped)
             print('Done.')
         return 0
     except Exception as e:

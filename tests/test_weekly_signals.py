@@ -160,6 +160,7 @@ def test_main_dry_run_prints_payload_without_pushing(monkeypatch, capsys):
     assert exit_code == 0
     assert pushed == []
     out = capsys.readouterr().out
+    assert '"stockpicks_v1"' in out
     assert '"regime": "BULL"' in out
     assert '"ticker": "HD"' in out
 
@@ -181,9 +182,10 @@ def test_main_pushes_regime_and_empty_signals_on_success(monkeypatch):
 
     assert exit_code == 0
     assert len(pushed) == 1
-    assert pushed[0]['regime'] == 'NEUTRAL'
-    assert pushed[0]['signals'] == []
-    assert 'updatedAt' in pushed[0]
+    assert list(pushed[0].keys()) == ['stockpicks_v1']
+    assert pushed[0]['stockpicks_v1']['regime'] == 'NEUTRAL'
+    assert pushed[0]['stockpicks_v1']['signals'] == []
+    assert 'updatedAt' in pushed[0]['stockpicks_v1']
 
 
 def test_main_does_not_push_when_scan_fails(monkeypatch):
